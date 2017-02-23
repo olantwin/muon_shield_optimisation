@@ -2,7 +2,10 @@
 import os
 import tempfile
 import numexpr as ne
-from multiprocessing import Pool, cpu_count, current_process, Process, Pipe
+from multiprocessing import Pipe
+from multiprocessing import Process
+from multiprocessing import cpu_count
+from multiprocessing import current_process
 import argparse
 import numpy as np
 import ROOT as r
@@ -13,18 +16,9 @@ from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
 
 
-def generate(pid, inputFile, nEvents):
-    mcEngine = 'TGeant4'
-    simEngine = 'MuonBack'
+def generate(inputFile, nEvents, outFile):
     nEvents = 100
     firstEvent = 0
-
-    outputDir = '.'
-    sameSeed = 1
-    theSeed = 1
-    dy = 10.
-    dv = 5
-    ds = 7
 
     # provisionally for making studies of various muon background sources
     inactivateMuonProcesses = True
@@ -33,22 +27,11 @@ def generate(pid, inputFile, nEvents):
 
     print 'FairShip setup for', simEngine, 'to produce', nEvents, 'events'
     r.gRandom.SetSeed(theSeed)
-    shipRoot_conf.configure()
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=dy,
         tankDesign=dv,
         muShieldDesign=ds)
-
-    # Output file name, add dy to be able to setup geometry with ambiguities.
-    tag = simEngine + '-' + mcEngine
-    if dv == 5:
-        tag = 'conical.' + tag
-    elif dy:
-        tag = str(dy) + '.' + tag
-    if not os.path.exists(outputDir):
-        os.makedirs(outputDir)
-    outFile = '{}/{}.ship.{}.root'.format(outputDir, pid, tag)
 
     run = r.FairRunSim()
     run.SetName(mcEngine)  # Transport engine
@@ -87,9 +70,6 @@ def generate(pid, inputFile, nEvents):
         mygMC.ProcessGeantCommand('/process/inactivate specialCutForMuon')
     run.Run(nEvents)
     print 'Macro finished succesfully.'
-
-    print 'Output file is ', outFile
-    return outFile
 
 
 def magnetMass(muonShield):
@@ -134,55 +114,66 @@ def FCN(W, x, L):
     return ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))')
 
 
-def worker(id_):
+def worker(master):
+    id_ = master.recv()
     ego = current_process()
-    worker_filename = "{}_{}.root".format(id_, args.njobs)
+    worker_filename = '{}_{}.root'.format(id_, args.njobs)
     n = (ntotal / args.njobs)
-    firstEvent = n*(id_-1)
+    firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
     print id_, ego.pid, 'Produce', n, 'events starting with event', firstEvent
     n = 100
     if os.path.isfile(worker_filename):
-        print worker_filename, "exists."
-        pass
+        print worker_filename, 'exists.'
     else:
-        f = r.TFile.Open("root://eoslhcb.cern.ch/"+args.input)
-        tree = f.Get("pythia8-Geant4")
-        worker_file = r.TFile.Open(worker_filename,"recreate")
-        worker_data = tree.CopyTree("","",n,firstEvent)
+        f = r.TFile.Open('root://eoslhcb.cern.ch/' + args.input)
+        tree = f.Get('pythia8-Geant4')
+        worker_file = r.TFile.Open(worker_filename, 'recreate')
+        worker_data = tree.CopyTree('', '', n, firstEvent)
         worker_data.Write()
         worker_file.Close()
-    outFile = generate(ego.pid, worker_filename, n)
-    ch = r.TChain('cbmsim')
-    ch.Add(outFile)
-    xs = []
-    mom = r.TVector3()
-    for event in ch:
-        weight = event.MCTrack[1].GetWeight()
-        if weight == 0:
-            weight = 1.
-        for hit in event.strawtubesPoint:
-            if hit:
-                if not hit.GetEnergyLoss() > 0:
-                    continue
-                if hit.GetDetectorID() / 10000000 == 4 and abs(hit.PdgCode(
-                )) == 13:
-                    hit.Momentum(mom)
-                    P = mom.Mag() / u.GeV
-                    if P > 1:
-                        y = hit.GetY()
-                        if abs(y) < 5 * u.m:
-                            x = hit.GetX()
-                            if x < 2.6 * u.m and x > -3 * u.m:
-                                xs.append(x)
-    return xs
+    # Output file name, add dy to be able to setup geometry with ambiguities.
+    tag = simEngine + '-' + mcEngine
+    if dv == 5:
+        tag = 'conical.' + tag
+    elif dy:
+        tag = str(dy) + '.' + tag
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+
+    outFile = '{}/{}.ship.{}.root'.format(outputDir, ego.pid, tag)
+    while master.recv():
+        p = Process(target=generate, args=(worker_filename, n, outFile))
+        p.start()
+        p.join()
+        ch = r.TChain('cbmsim')
+        ch.Add(outFile)
+        xs = []
+        mom = r.TVector3()
+        for event in ch:
+            weight = event.MCTrack[1].GetWeight()
+            if weight == 0:
+                weight = 1.
+            for hit in event.strawtubesPoint:
+                if hit:
+                    if not hit.GetEnergyLoss() > 0:
+                        continue
+                    if hit.GetDetectorID() / 10000000 == 4 and abs(hit.PdgCode(
+                    )) == 13:
+                        hit.Momentum(mom)
+                        P = mom.Mag() / u.GeV
+                        if P > 1:
+                            y = hit.GetY()
+                            if abs(y) < 5 * u.m:
+                                x = hit.GetX()
+                                if x < 2.6 * u.m and x > -3 * u.m:
+                                    xs.append(x)
+        master.send(xs)
+        os.remove(outFile)
+    print 'Worker process {} done.'.format(id_)
 
 
 def get_geo(out):
-    dy = 10.
-    dv = 5
-    ds = 7
-    shipRoot_conf.configure()
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=dy,
@@ -205,15 +196,32 @@ def get_geo(out):
 
 
 def main():
-    out_, in_ = Pipe(duplex=False)
-    geo_process = Process(target=get_geo, args=[in_])
-    geo_process.start()
-    pool = Pool(processes=args.njobs)
-    xss = pool.map(worker, range(1, args.njobs + 1))
-    xs = [x for xs_ in xss for x in xs_]
-    L, W = out_.recv()
-    fcn = FCN(W, np.array(xs), L)
-    print fcn
+    geo_master, geo_worker = Pipe(duplex=True)
+    workers, masters = [], []
+    ps = []
+    for i in range(args.njobs):
+        m, w = Pipe(duplex=True)
+        workers.append(w)
+        masters.append(m)
+        p = Process(target=worker, args=[m])
+        p.start()
+        ps.append(p)
+        w.send(i + 1)
+
+    for _ in range(2):
+        geo_process = Process(target=get_geo, args=[geo_master])
+        geo_process.start()
+        xss = []
+        for w in workers:
+            w.send(True)
+        for w in workers:
+            xss.append(w.recv())
+        xs = [x for xs_ in xss for x in xs_]
+        L, W = geo_worker.recv()
+        fcn = FCN(W, np.array(xs), L)
+        print fcn
+    for w in workers:
+        w.send(False)
     return fcn
 
 
@@ -223,12 +231,22 @@ if __name__ == '__main__':
     parser.add_argument(
         '-f',
         '--input',
-        default='/eos/ship/data/Mbias/pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
+        default='/eos/ship/data/Mbias/pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'
+    )
     parser.add_argument(
         '-n',
         '--njobs',
         type=int,
         default=min(8, cpu_count()), )
     args = parser.parse_args()
+    shipRoot_conf.configure()
     ntotal = 17786274
+    dy = 10.
+    dv = 5
+    ds = 7
+    mcEngine = 'TGeant4'
+    simEngine = 'MuonBack'
+    outputDir = '.'
+    sameSeed = 1
+    theSeed = 1
     main()
