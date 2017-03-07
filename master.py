@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 import os
+import random
 import tempfile
 import numexpr as ne
 from multiprocessing import Pipe
@@ -11,12 +12,11 @@ import numpy as np
 import ROOT as r
 import shipunit as u
 import geomGeant4
-import shipRoot_conf
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
 
 
-def generate(inputFile, nEvents, outFile):
+def generate(inputFile, geoFile, nEvents, outFile):
     nEvents = 100
     firstEvent = 0
 
@@ -30,8 +30,9 @@ def generate(inputFile, nEvents, outFile):
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=dy,
-        tankDesign=dv,
-        muShieldDesign=ds)
+        tankDesign=vessel_design,
+        muShieldDesign=shield_design,
+        muShieldGeo=geoFile)
 
     run = r.FairRunSim()
     run.SetName(mcEngine)  # Transport engine
@@ -134,16 +135,17 @@ def worker(master):
         worker_file.Close()
     # Output file name, add dy to be able to setup geometry with ambiguities.
     tag = simEngine + '-' + mcEngine
-    if dv == 5:
-        tag = 'conical.' + tag
-    elif dy:
-        tag = str(dy) + '.' + tag
+    tag = 'conical.' + tag
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
     outFile = '{}/{}.ship.{}.root'.format(outputDir, ego.pid, tag)
-    while master.recv():
-        p = Process(target=generate, args=(worker_filename, n, outFile))
+    # TODO read geometry from queue after each iteration
+    while True:
+        geoFile = master.recv()
+        if not geoFile:
+            break
+        p = Process(target=generate, args=(worker_filename, geoFile, n, outFile))
         p.start()
         p.join()
         ch = r.TChain('cbmsim')
@@ -173,12 +175,13 @@ def worker(master):
     print 'Worker process {} done.'.format(id_)
 
 
-def get_geo(out):
+def get_geo(geoFile):
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=dy,
-        tankDesign=dv,
-        muShieldDesign=ds)
+        tankDesign=vessel_design,
+        muShieldDesign=shield_design,
+        muShieldGeo=geoFile)
 
     with tempfile.NamedTemporaryFile() as t:
         run = r.FairRunSim()
@@ -189,44 +192,82 @@ def get_geo(out):
         run.Init()
         run.Run(0)
         sGeo = r.gGeoManager
+        # sGeo.Export('test.gdml')
+        # sGeo = r.TGeoManager.Import('test.gdml')
+        iron = sGeo.GetMedium('iron')
+        old = sGeo.GetVolume("Magn7_MagBotRight")
+        new = sGeo.MakeArb8('test', iron, 5. * u.m, np.array([-80.,-310.,-0.,-390.,-215.,-390.,-135.,-310.,-80.,-310.,-0.,-390.,-215.,-390.,-135.,-310.]))
+        assert old
+        assert new
+        print sGeo.ReplaceVolume(old, new)
+        # TODO Remove old volume?
+        sGeo.RefreshPhysicalNodes()
+        sGeo.Export('test2.gdml')
+        # sGeo = r.TGeoManager.Import('test.gdml')
         muonShield = sGeo.GetVolume('MuonShieldArea')
         L = magnetLength(muonShield)
         W = magnetMass(muonShield)
-    out.send([L, W])
+    return L, W
+
+
+def geo_guessr():
+    dZgap = 0.1*u.m
+    zGap = 0.5 * dZgap  # halflengh of gap
+    dZ1 = 0.7*u.m
+    dZ2 = 1.7*u.m
+    dZ3 = 2.0*u.m + zGap
+    dZ4 = 2.0*u.m + zGap
+    dZ5 = 2.75*u.m + zGap
+    dZ6 = 2.4*u.m + zGap
+    dZ7 = 3.0*u.m + zGap
+    dZ8 = 2.35*u.m + zGap
+    params = [dZ1, dZ2, dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
+    for i in range(9):
+        # TODO take care of exceptions
+        minimum = 1.*u.m
+        dXIn = minimum + random.random()*u.m
+        dXOut = minimum + random.random()*u.m
+        dYIn = minimum + random.random()*u.m
+        dYOut = minimum + random.random()*u.m
+        gapIn = 20.
+        gapOut = 20.
+        params += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
+    return params
+
+
+def generate_geo(geofile, params):
+    f = r.TFile.Open(geofile, 'recreate')
+    parray = r.TVectorD(len(params), np.array(params))
+    parray.Write("params")
+    f.Close()
+    return geofile
 
 
 def main():
-    geo_master, geo_worker = Pipe(duplex=True)
-    workers, masters = [], []
-    ps = []
-    for i in range(args.njobs):
-        m, w = Pipe(duplex=True)
-        workers.append(w)
-        masters.append(m)
-        p = Process(target=worker, args=[m])
-        p.start()
-        ps.append(p)
-        w.send(i + 1)
+    pipes = [Pipe(duplex=True) for _ in range(args.njobs)]
+    ps = [(w, Process(target=worker, args=[m])) for m, w in pipes]
+    for i, p in enumerate(ps):
+        p[1].start()
+        p[0].send(i + 1)
 
     for _ in range(2):
-        geo_process = Process(target=get_geo, args=[geo_master])
-        geo_process.start()
-        xss = []
-        for w in workers:
-            w.send(True)
-        for w in workers:
-            xss.append(w.recv())
+        # TODO generate geofilename automatically
+        params = geo_guessr()
+        geoFile = generate_geo("placeholder_{}.root".format(_), params)
+        L, W = get_geo(geoFile)
+        for w, _ in ps:
+            w.send(geoFile)
+        xss = [w.recv() for w, _ in ps]
         xs = [x for xs_ in xss for x in xs_]
-        L, W = geo_worker.recv()
         fcn = FCN(W, np.array(xs), L)
         print fcn
-    for w in workers:
+    for w, _ in ps:
         w.send(False)
-    return fcn
 
 
 if __name__ == '__main__':
     r.gErrorIgnoreLevel = r.kWarning
+    r.gSystem.Load("libpythia8")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-f',
@@ -239,11 +280,10 @@ if __name__ == '__main__':
         type=int,
         default=min(8, cpu_count()), )
     args = parser.parse_args()
-    shipRoot_conf.configure()
     ntotal = 17786274
     dy = 10.
-    dv = 5
-    ds = 7
+    vessel_design = 5
+    shield_design = 8
     mcEngine = 'TGeant4'
     simEngine = 'MuonBack'
     outputDir = '.'
