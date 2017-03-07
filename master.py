@@ -192,18 +192,6 @@ def get_geo(geoFile):
         run.Init()
         run.Run(0)
         sGeo = r.gGeoManager
-        # sGeo.Export('test.gdml')
-        # sGeo = r.TGeoManager.Import('test.gdml')
-        iron = sGeo.GetMedium('iron')
-        old = sGeo.GetVolume("Magn7_MagBotRight")
-        new = sGeo.MakeArb8('test', iron, 5. * u.m, np.array([-80.,-310.,-0.,-390.,-215.,-390.,-135.,-310.,-80.,-310.,-0.,-390.,-215.,-390.,-135.,-310.]))
-        assert old
-        assert new
-        print sGeo.ReplaceVolume(old, new)
-        # TODO Remove old volume?
-        sGeo.RefreshPhysicalNodes()
-        sGeo.Export('test2.gdml')
-        # sGeo = r.TGeoManager.Import('test.gdml')
         muonShield = sGeo.GetVolume('MuonShieldArea')
         L = magnetLength(muonShield)
         W = magnetMass(muonShield)
@@ -224,7 +212,7 @@ def geo_guessr():
     params = [dZ1, dZ2, dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
     for i in range(9):
         # TODO take care of exceptions
-        minimum = 1.*u.m
+        minimum = 1. * u.m
         dXIn = minimum + random.random()*u.m
         dXOut = minimum + random.random()*u.m
         dYIn = minimum + random.random()*u.m
