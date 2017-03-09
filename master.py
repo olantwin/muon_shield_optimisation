@@ -175,7 +175,7 @@ def worker(master):
     print 'Worker process {} done.'.format(id_)
 
 
-def get_geo(geoFile):
+def get_geo(geoFile, out):
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=dy,
@@ -190,12 +190,18 @@ def get_geo(geoFile):
         run.SetUserConfig('g4Config.C')
         modules = shipDet_conf.configure(run, ship_geo)
         run.Init()
-        run.Run(0)
+        run.CreateGeometryFile("./geo/" + os.path.basename(geoFile))
         sGeo = r.gGeoManager
         muonShield = sGeo.GetVolume('MuonShieldArea')
+        muonShield.Draw("ogl")
         L = magnetLength(muonShield)
+        # TODO calculate length analytically from params to compare/check?
         W = magnetMass(muonShield)
-    return L, W
+        try:
+            _ = raw_input("press enter to continue...")
+        except:
+            pass
+    out.send((L, W))
 
 
 def geo_guessr():
@@ -203,22 +209,25 @@ def geo_guessr():
     zGap = 0.5 * dZgap  # halflengh of gap
     dZ1 = 0.7*u.m
     dZ2 = 1.7*u.m
-    dZ3 = 2.0*u.m + zGap
-    dZ4 = 2.0*u.m + zGap
-    dZ5 = 2.75*u.m + zGap
-    dZ6 = 2.4*u.m + zGap
-    dZ7 = 3.0*u.m + zGap
-    dZ8 = 2.35*u.m + zGap
+    dZ3 = 0.2 * u.m + 3. * random.random()*u.m + zGap
+    dZ4 = 0.2 * u.m + 3. * random.random()*u.m + zGap
+    dZ5 = 0.2 * u.m + 3. * random.random()*u.m + zGap
+    dZ6 = 0.2 * u.m + 3. * random.random()*u.m + zGap
+    dZ7 = 0.2 * u.m + 3. * random.random()*u.m + zGap
+    dZ8 = 0.2 * u.m + 3. * random.random()*u.m + zGap
     params = [dZ1, dZ2, dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
-    for i in range(9):
-        # TODO take care of exceptions
-        minimum = 1. * u.m
-        dXIn = minimum + random.random()*u.m
-        dXOut = minimum + random.random()*u.m
-        dYIn = minimum + random.random()*u.m
-        dYOut = minimum + random.random()*u.m
-        gapIn = 20.
-        gapOut = 20.
+    for i in range(8):
+        minimum = 0.1 * u.m
+        dXIn = minimum +  2.4 * random.random()*u.m
+        dXOut = minimum +  2.4 * random.random()*u.m
+        dYIn = minimum +  2.4 * random.random()*u.m
+        dYOut = minimum +  2.4 * random.random()*u.m
+        assert dXIn + dYIn <= 5. * u.m
+        assert dXOut + dYOut <= 5. * u.m
+        gapIn = 2. * minimum + 4.8 * random.random()*u.m
+        gapOut = 2. * minimum + 4.8 * random.random()*u.m
+        assert 2* dXIn + gapIn <= 10. * u.m
+        assert 2* dXOut + gapOut <= 10. * u.m
         params += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
     return params
 
@@ -238,11 +247,15 @@ def main():
         p[1].start()
         p[0].send(i + 1)
 
-    for _ in range(2):
-        # TODO generate geofilename automatically
+    counter = 0
+    for _ in range(1):
         params = geo_guessr()
-        geoFile = generate_geo("placeholder_{}.root".format(_), params)
-        L, W = get_geo(geoFile)
+        counter += 1
+        geoFile = generate_geo("geo_{}.root".format(counter), params)
+        out_, in_ = Pipe(duplex=False)
+        geo_process = Process(target=get_geo, args=[geoFile, in_])
+        geo_process.start()
+        L, W = out_.recv()
         for w, _ in ps:
             w.send(geoFile)
         xss = [w.recv() for w, _ in ps]
