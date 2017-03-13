@@ -11,66 +11,9 @@ import argparse
 import numpy as np
 import ROOT as r
 import shipunit as u
-import geomGeant4
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
-
-
-def generate(inputFile, geoFile, nEvents, outFile):
-    nEvents = 100
-    firstEvent = 0
-
-    # provisionally for making studies of various muon background sources
-    inactivateMuonProcesses = True
-    phiRandom = False  # only relevant for muon background generator
-    followMuon = False  # only transport muons for a fast muon only background
-
-    print 'FairShip setup for', simEngine, 'to produce', nEvents, 'events'
-    r.gRandom.SetSeed(theSeed)
-    ship_geo = ConfigRegistry.loadpy(
-        '$FAIRSHIP/geometry/geometry_config.py',
-        Yheight=dy,
-        tankDesign=vessel_design,
-        muShieldDesign=shield_design,
-        muShieldGeo=geoFile)
-
-    run = r.FairRunSim()
-    run.SetName(mcEngine)  # Transport engine
-    run.SetOutputFile(outFile)  # Output file
-    # user configuration file default g4Config.C
-    run.SetUserConfig('g4Config.C')
-    modules = shipDet_conf.configure(run, ship_geo)
-    primGen = r.FairPrimaryGenerator()
-    primGen.SetTarget(ship_geo.target.z0 + 50 * u.m, 0.)
-    MuonBackgen = r.MuonBackGenerator()
-    MuonBackgen.Init(inputFile, firstEvent, phiRandom)
-    MuonBackgen.SetSmearBeam(3 * u.cm)  # beam size mimicking spiral
-    if sameSeed:
-        MuonBackgen.SetSameSeed(sameSeed)
-    primGen.AddGenerator(MuonBackgen)
-    nEvents = min(nEvents, MuonBackgen.GetNevents())
-    print 'Process ', nEvents, ' from input file, with Phi random=', phiRandom
-    if followMuon:
-        modules['Veto'].SetFastMuon()
-    run.SetGenerator(primGen)
-    run.SetStoreTraj(r.kFALSE)
-    run.Init()
-    if hasattr(ship_geo, 'muShieldDesign'):
-        if ship_geo.muShieldDesign != 1:
-            geomGeant4.setMagnetField()
-    if inactivateMuonProcesses:
-        mygMC = r.TGeant4.GetMC()
-        mygMC.ProcessGeantCommand('/process/inactivate muPairProd')
-        mygMC.ProcessGeantCommand('/process/inactivate muBrems')
-        mygMC.ProcessGeantCommand('/process/inactivate muIoni')
-        mygMC.ProcessGeantCommand('/process/inactivate msc')
-        mygMC.ProcessGeantCommand('/process/inactivate Decay')
-        mygMC.ProcessGeantCommand('/process/inactivate CoulombScat')
-        mygMC.ProcessGeantCommand('/process/inactivate muonNuclear')
-        mygMC.ProcessGeantCommand('/process/inactivate StepLimiter')
-        mygMC.ProcessGeantCommand('/process/inactivate specialCutForMuon')
-    run.Run(nEvents)
-    print 'Macro finished succesfully.'
+from slave import generate
 
 
 def magnetMass(muonShield):
@@ -127,7 +70,7 @@ def worker(master):
     if os.path.isfile(worker_filename):
         print worker_filename, 'exists.'
     else:
-        f = r.TFile.Open('root://eoslhcb.cern.ch/' + args.input)
+        f = r.TFile.Open(args.input)
         tree = f.Get('pythia8-Geant4')
         worker_file = r.TFile.Open(worker_filename, 'recreate')
         worker_data = tree.CopyTree('', '', n, firstEvent)
@@ -145,7 +88,8 @@ def worker(master):
         geoFile = master.recv()
         if not geoFile:
             break
-        p = Process(target=generate, args=(worker_filename, geoFile, n, outFile))
+        p = Process(
+            target=generate, args=(worker_filename, geoFile, n, outFile))
         p.start()
         p.join()
         ch = r.TChain('cbmsim')
@@ -190,44 +134,39 @@ def get_geo(geoFile, out):
         run.SetUserConfig('g4Config.C')
         modules = shipDet_conf.configure(run, ship_geo)
         run.Init()
-        run.CreateGeometryFile("./geo/" + os.path.basename(geoFile))
+        run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
         sGeo = r.gGeoManager
         muonShield = sGeo.GetVolume('MuonShieldArea')
-        muonShield.Draw("ogl")
         L = magnetLength(muonShield)
         # TODO calculate length analytically from params to compare/check?
         W = magnetMass(muonShield)
-        try:
-            _ = raw_input("press enter to continue...")
-        except:
-            pass
     out.send((L, W))
 
 
 def geo_guessr():
-    dZgap = 0.1*u.m
+    dZgap = 0.1 * u.m
     zGap = 0.5 * dZgap  # halflengh of gap
-    dZ1 = 0.7*u.m
-    dZ2 = 1.7*u.m
-    dZ3 = 0.2 * u.m + 3. * random.random()*u.m + zGap
-    dZ4 = 0.2 * u.m + 3. * random.random()*u.m + zGap
-    dZ5 = 0.2 * u.m + 3. * random.random()*u.m + zGap
-    dZ6 = 0.2 * u.m + 3. * random.random()*u.m + zGap
-    dZ7 = 0.2 * u.m + 3. * random.random()*u.m + zGap
-    dZ8 = 0.2 * u.m + 3. * random.random()*u.m + zGap
+    dZ1 = 0.7 * u.m
+    dZ2 = 1.7 * u.m
+    dZ3 = 0.2 * u.m + 3. * random.random() * u.m + zGap
+    dZ4 = 0.2 * u.m + 3. * random.random() * u.m + zGap
+    dZ5 = 0.2 * u.m + 3. * random.random() * u.m + zGap
+    dZ6 = 0.2 * u.m + 3. * random.random() * u.m + zGap
+    dZ7 = 0.2 * u.m + 3. * random.random() * u.m + zGap
+    dZ8 = 0.2 * u.m + 3. * random.random() * u.m + zGap
     params = [dZ1, dZ2, dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
-    for i in range(8):
+    for _ in range(8):
         minimum = 0.1 * u.m
-        dXIn = minimum +  2.4 * random.random()*u.m
-        dXOut = minimum +  2.4 * random.random()*u.m
-        dYIn = minimum +  2.4 * random.random()*u.m
-        dYOut = minimum +  2.4 * random.random()*u.m
+        dXIn = minimum + 2.4 * random.random() * u.m
+        dXOut = minimum + 2.4 * random.random() * u.m
+        dYIn = minimum + 2.4 * random.random() * u.m
+        dYOut = minimum + 2.4 * random.random() * u.m
         assert dXIn + dYIn <= 5. * u.m
         assert dXOut + dYOut <= 5. * u.m
-        gapIn = 2. * minimum + 4.8 * random.random()*u.m
-        gapOut = 2. * minimum + 4.8 * random.random()*u.m
-        assert 2* dXIn + gapIn <= 10. * u.m
-        assert 2* dXOut + gapOut <= 10. * u.m
+        gapIn = 2. + 4.98 * random.random() * u.m
+        gapOut = 2. + 4.98 * random.random() * u.m
+        assert 2 * dXIn + gapIn <= 10. * u.m
+        assert 2 * dXOut + gapOut <= 10. * u.m
         params += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
     return params
 
@@ -235,7 +174,7 @@ def geo_guessr():
 def generate_geo(geofile, params):
     f = r.TFile.Open(geofile, 'recreate')
     parray = r.TVectorD(len(params), np.array(params))
-    parray.Write("params")
+    parray.Write('params')
     f.Close()
     return geofile
 
@@ -251,7 +190,7 @@ def main():
     for _ in range(1):
         params = geo_guessr()
         counter += 1
-        geoFile = generate_geo("geo_{}.root".format(counter), params)
+        geoFile = generate_geo('geo_{}.root'.format(counter), params)
         out_, in_ = Pipe(duplex=False)
         geo_process = Process(target=get_geo, args=[geoFile, in_])
         geo_process.start()
@@ -261,6 +200,9 @@ def main():
         xss = [w.recv() for w, _ in ps]
         xs = [x for xs_ in xss for x in xs_]
         fcn = FCN(W, np.array(xs), L)
+        assert np.isclose(
+            L / 2., sum(params[:8]) + 5
+        ), 'Analytical and ROOT lengths are not the same.'
         print fcn
     for w, _ in ps:
         w.send(False)
@@ -268,12 +210,14 @@ def main():
 
 if __name__ == '__main__':
     r.gErrorIgnoreLevel = r.kWarning
-    r.gSystem.Load("libpythia8")
+    r.gSystem.Load('libpythia8')
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-f',
         '--input',
-        default='/eos/ship/data/Mbias/pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'
+        default='root://eoslhcb.cern.ch/'
+        '/eos/ship/data/Mbias/'
+        'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'
     )
     parser.add_argument(
         '-n',
@@ -281,7 +225,9 @@ if __name__ == '__main__':
         type=int,
         default=min(8, cpu_count()), )
     args = parser.parse_args()
-    ntotal = 17786274
+    # ntotal = 17786274
+    ntotal = 86229
+    # TODO read total number from muon file directly
     dy = 10.
     vessel_design = 5
     shield_design = 8
