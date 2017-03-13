@@ -59,6 +59,7 @@ def FCN(W, x, L):
 
 
 def worker(master):
+    # TODO migrate to slave.py
     id_ = master.recv()
     ego = current_process()
     worker_filename = '{}_{}.root'.format(id_, args.njobs)
@@ -132,13 +133,12 @@ def get_geo(geoFile, out):
         run.SetName('TGeant4')  # Transport engine
         run.SetOutputFile(t.name)  # Output file
         run.SetUserConfig('g4Config.C')
-        modules = shipDet_conf.configure(run, ship_geo)
+        shipDet_conf.configure(run, ship_geo)
         run.Init()
         run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
         sGeo = r.gGeoManager
         muonShield = sGeo.GetVolume('MuonShieldArea')
         L = magnetLength(muonShield)
-        # TODO calculate length analytically from params to compare/check?
         W = magnetMass(muonShield)
     out.send((L, W))
 

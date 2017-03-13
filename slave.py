@@ -4,13 +4,13 @@ import tempfile
 import argparse
 import ROOT as r
 import shipunit as u
+import numpy as np
 import geomGeant4
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
 
 
 def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
-    # nEvents = 100
     firstEvent = 0
     dy = 10.
     vessel_design = 5
@@ -75,26 +75,15 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
 def main():
     id_ = args.jobid
     outputDir = '.'
-    worker_filename = '{}_{}.root'.format(id_, args.njobs)
-    n = (ntotal / args.njobs)
-    firstEvent = n * (id_ - 1)
-    n += (ntotal % args.njobs if id_ == args.njobs else 0)
-    print id_, 'Produce', n, 'events starting with event', firstEvent
+    n = args.nEvents if args.nEvents else 100
+    # TODO read total number from muon file directly OR
+    # TODO always pass from steering process?
     # TODO split in steering process
-    if os.path.isfile(worker_filename):
-        print worker_filename, 'exists.'
-    else:
-        f = r.TFile.Open(args.input)
-        tree = f.Get('pythia8-Geant4')
-        worker_file = r.TFile.Open(worker_filename, 'recreate')
-        worker_data = tree.CopyTree('', '', n, firstEvent)
-        worker_data.Write()
-        worker_file.Close()
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
 
     with tempfile.NamedTemporaryFile() as t:
-        generate(worker_filename, args.geofile, n, t.name, args.lofi)
+        generate(args.input, args.geofile, n, t.name, args.lofi)
         ch = r.TChain('cbmsim')
         ch.Add(t.name)
         xs = []
@@ -115,7 +104,11 @@ def main():
                                 (x < 2.6 * u.m and x > -3 * u.m)
                         ):
                             xs.append(x)
-    # TODO write results
+    res = r.TFile.Open(args.results, 'recreate')
+    if xs:
+        results = r.TVectorD(len(xs), np.array(xs))
+        results.Write('results')
+    res.Close()
     print 'Worker process {} done.'.format(id_)
 
 
@@ -126,17 +119,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '-f',
         '--input',
-        default='root:/eoslhcb.cern.ch/'
+        default='root://eoslhcb.cern.ch/'
         '/eos/ship/data/Mbias/'
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument(
         '--results',
-        default='test.pkl'  # TODO EOS
+        default='root://eoslhcb.cern.ch//eos/ship/user/olantwin/test.root'
     )
-    parser.add_argument('--geofile')
-    parser.add_argument('--jobid', type=int)
+    parser.add_argument('--geofile', required=True)
+    parser.add_argument('--jobid', type=int, required=True)
+    parser.add_argument('-n','--nEvents', type=int, default=None)
     parser.add_argument('--lofi', action='store_true')
     args = parser.parse_args()
-    ntotal = 86229
-    # TODO read total number from muon file directly
     main()
