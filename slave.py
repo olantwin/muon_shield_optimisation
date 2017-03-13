@@ -74,13 +74,9 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
 
 def main():
     id_ = args.jobid
-    outputDir = '.'
     n = args.nEvents if args.nEvents else 100
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
-    # TODO split in steering process
-    if not os.path.exists(outputDir):
-        os.makedirs(outputDir)
 
     with tempfile.NamedTemporaryFile() as t:
         generate(args.input, args.geofile, n, t.name, args.lofi)

@@ -3,6 +3,7 @@ import os
 import random
 import tempfile
 import numexpr as ne
+import subprocess
 from multiprocessing import Pipe
 from multiprocessing import Process
 from multiprocessing import cpu_count
@@ -13,7 +14,6 @@ import ROOT as r
 import shipunit as u
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
-from slave import generate
 
 
 def magnetMass(muonShield):
@@ -59,7 +59,6 @@ def FCN(W, x, L):
 
 
 def worker(master):
-    # TODO migrate to slave.py
     id_ = master.recv()
     ego = current_process()
     worker_filename = '{}_{}.root'.format(id_, args.njobs)
@@ -89,32 +88,16 @@ def worker(master):
         geoFile = master.recv()
         if not geoFile:
             break
-        p = Process(
-            target=generate, args=(worker_filename, geoFile, n, outFile))
-        p.start()
-        p.join()
-        ch = r.TChain('cbmsim')
-        ch.Add(outFile)
-        xs = []
-        mom = r.TVector3()
-        for event in ch:
-            weight = event.MCTrack[1].GetWeight()
-            if weight == 0:
-                weight = 1.
-            for hit in event.strawtubesPoint:
-                if hit:
-                    if not hit.GetEnergyLoss() > 0:
-                        continue
-                    if hit.GetDetectorID() / 10000000 == 4 and abs(hit.PdgCode(
-                    )) == 13:
-                        hit.Momentum(mom)
-                        P = mom.Mag() / u.GeV
-                        if P > 1:
-                            y = hit.GetY()
-                            if abs(y) < 5 * u.m:
-                                x = hit.GetX()
-                                if x < 2.6 * u.m and x > -3 * u.m:
-                                    xs.append(x)
+        subprocess.call(
+            [
+                './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
+                worker_filename, '-n', str(n), '--results', outFile, '--lofi'
+            ],
+            shell=False)
+        f = r.TFile.Open(outFile)
+        xs = r.TVectorD()
+        xs.Read('results')
+        f.Close()
         master.send(xs)
         os.remove(outFile)
     print 'Worker process {} done.'.format(id_)
@@ -200,9 +183,8 @@ def main():
         xss = [w.recv() for w, _ in ps]
         xs = [x for xs_ in xss for x in xs_]
         fcn = FCN(W, np.array(xs), L)
-        assert np.isclose(
-            L / 2., sum(params[:8]) + 5
-        ), 'Analytical and ROOT lengths are not the same.'
+        assert np.isclose(L / 2., sum(params[:8]) +
+                          5), 'Analytical and ROOT lengths are not the same.'
         print fcn
     for w, _ in ps:
         w.send(False)
@@ -217,8 +199,7 @@ if __name__ == '__main__':
         '--input',
         default='root://eoslhcb.cern.ch/'
         '/eos/ship/data/Mbias/'
-        'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'
-    )
+        'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument(
         '-n',
         '--njobs',
