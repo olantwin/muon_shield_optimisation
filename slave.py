@@ -74,7 +74,7 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
 
 def main():
     id_ = args.jobid
-    n = args.nEvents if args.nEvents else 100
+    n = args.nEvents if args.nEvents else 100000
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
 
