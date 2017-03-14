@@ -10,7 +10,7 @@ from multiprocessing import cpu_count
 from multiprocessing import current_process
 import argparse
 import numpy as np
-from scipy.optimize import minimize
+from skopt import gp_minimize, dump
 import ROOT as r
 import shipunit as u
 from ShipGeoConfig import ConfigRegistry
@@ -56,14 +56,15 @@ def FCN(W, x, L):
     """
     Sxi2 = ne.evaluate('sum(sqrt(560-(x+300.)/560))') if x else 0.
     print W, x, L, Sxi2
-    return ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))')
+    return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
 
 
 def worker(master):
     id_ = master.recv()
     ego = current_process()
     worker_filename = (
-        '{}/worker_files/muons_{}_{}.root').format(args.workDir, id_, args.njobs)
+        '{}/worker_files/muons_{}_{}.root'
+    ).format(args.workDir, id_, args.njobs)
     n = (ntotal / args.njobs)
     firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
@@ -95,7 +96,7 @@ def worker(master):
         f.ls()
         xs.Read('results')
         f.Close()
-        master.send(xs)
+        master.send([])
     print 'Worker process {} done.'.format(id_)
 
 
@@ -125,15 +126,13 @@ def get_geo(geoFile, out):
 def geo_guessr():
     dZgap = 0.1 * u.m
     zGap = 0.5 * dZgap  # halflengh of gap
-    dZ1 = 0.7 * u.m
-    dZ2 = 1.7 * u.m
     dZ3 = 0.2 * u.m + 3. * random.random() * u.m + zGap
     dZ4 = 0.2 * u.m + 3. * random.random() * u.m + zGap
     dZ5 = 0.2 * u.m + 3. * random.random() * u.m + zGap
     dZ6 = 0.2 * u.m + 3. * random.random() * u.m + zGap
     dZ7 = 0.2 * u.m + 3. * random.random() * u.m + zGap
     dZ8 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    params = [dZ1, dZ2, dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
+    params = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
     for _ in range(8):
         minimum = 0.1 * u.m
         dXIn = minimum + 2.4 * random.random() * u.m
@@ -148,6 +147,28 @@ def geo_guessr():
         assert 2 * dXOut + gapOut <= 10. * u.m
         params += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
     return params
+
+
+def get_bounds():
+    dZgap = 0.1 * u.m
+    zGap = 0.5 * dZgap  # halflengh of gap
+    dZ3 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    dZ4 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    dZ5 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    dZ6 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    dZ7 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    dZ8 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    bounds = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
+    for _ in range(8):
+        minimum = 0.1 * u.m
+        dXIn = (minimum, 2.5 * u.m)
+        dXOut = (minimum, 2.5 * u.m)
+        dYIn = (minimum, 2.5 * u.m)
+        dYOut = (minimum, 2.5 * u.m)
+        gapIn = (2., 4.98 * u.m)
+        gapOut = (2., 4.98 * u.m)
+        bounds += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
+    return bounds
 
 
 def generate_geo(geofile, params):
@@ -166,9 +187,11 @@ def main():
         p[0].send(i + 1)
 
     def compute_FCN(params):
+        params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
         geoFile = generate_geo(
-            '{}/input_files/geo_{}.root'.format(args.workDir, compute_FCN.counter),
-            params)
+            '{}/input_files/geo_{}.root'.format(
+                args.workDir, compute_FCN.counter
+            ), params)
         out_, in_ = Pipe(duplex=False)
         geo_process = Process(target=get_geo, args=[geoFile, in_])
         geo_process.start()
@@ -181,16 +204,17 @@ def main():
         assert np.isclose(L / 2., sum(params[:8]) +
                           5), 'Analytical and ROOT lengths are not the same.'
         compute_FCN.counter += 1
+        print fcn
         return fcn
 
     compute_FCN.counter = 0
-    params = geo_guessr()
-    res = minimize(
+    bounds = get_bounds()
+    res = gp_minimize(
         compute_FCN,
-        params,
-        method='Nelder-Mead',  # TODO try 'Anneal'
-        options={'maxiter': 10})
-    print res.message
+        bounds,
+        n_calls=20)
+    print res
+    dump(res, "minimisation_result")
     for w, _ in ps:
         w.send(False)
 
