@@ -10,6 +10,7 @@ from multiprocessing import cpu_count
 from multiprocessing import current_process
 import argparse
 import numpy as np
+from scipy.optimize import minimize
 import ROOT as r
 import shipunit as u
 from ShipGeoConfig import ConfigRegistry
@@ -61,12 +62,14 @@ def FCN(W, x, L):
 def worker(master):
     id_ = master.recv()
     ego = current_process()
-    worker_filename = '{}_{}.root'.format(id_, args.njobs)
+    worker_filename = (
+        'root://eoslhcb.cern.ch/'
+        '/eos/ship/user/olantwin/'
+        'skygrid/worker_files/{}/muons_{}.root').format(id_, args.njobs)
     n = (ntotal / args.njobs)
     firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
     print id_, ego.pid, 'Produce', n, 'events starting with event', firstEvent
-    n = 100
     if os.path.isfile(worker_filename):
         print worker_filename, 'exists.'
     else:
@@ -76,14 +79,10 @@ def worker(master):
         worker_data = tree.CopyTree('', '', n, firstEvent)
         worker_data.Write()
         worker_file.Close()
-    # Output file name, add dy to be able to setup geometry with ambiguities.
-    tag = simEngine + '-' + mcEngine
-    tag = 'conical.' + tag
-    if not os.path.exists(outputDir):
-        os.makedirs(outputDir)
 
-    outFile = '{}/{}.ship.{}.root'.format(outputDir, ego.pid, tag)
-    # TODO read geometry from queue after each iteration
+    outFile = ('root://eoslhcb.cern.ch/'
+               '/eos/ship/user/olantwin/skygrid/output_files/result_{}.root'
+              ).format(id_)
     while True:
         geoFile = master.recv()
         if not geoFile:
@@ -94,12 +93,13 @@ def worker(master):
                 worker_filename, '-n', str(n), '--results', outFile, '--lofi'
             ],
             shell=False)
+        # TODO wait for result
         f = r.TFile.Open(outFile)
         xs = r.TVectorD()
+        f.ls()
         xs.Read('results')
         f.Close()
         master.send(xs)
-        os.remove(outFile)
     print 'Worker process {} done.'.format(id_)
 
 
@@ -169,11 +169,12 @@ def main():
         p[1].start()
         p[0].send(i + 1)
 
-    counter = 0
-    for _ in range(1):
-        params = geo_guessr()
-        counter += 1
-        geoFile = generate_geo('geo_{}.root'.format(counter), params)
+    def compute_FCN(params):
+        geoFile = generate_geo(
+            'root://eoslhcb.cern.ch/'
+            '/eos/ship/user/olantwin/skygrid/'
+            'input_files/geo_{}.root'.format(compute_FCN.counter),
+            params)
         out_, in_ = Pipe(duplex=False)
         geo_process = Process(target=get_geo, args=[geoFile, in_])
         geo_process.start()
@@ -185,7 +186,17 @@ def main():
         fcn = FCN(W, np.array(xs), L)
         assert np.isclose(L / 2., sum(params[:8]) +
                           5), 'Analytical and ROOT lengths are not the same.'
-        print fcn
+        compute_FCN.counter += 1
+        return fcn
+
+    compute_FCN.counter = 0
+    params = geo_guessr()
+    res = minimize(
+        compute_FCN,
+        params,
+        method='Nelder-Mead',  # TODO try 'Anneal'
+        options={'maxiter': 10})
+    print res.message
     for w, _ in ps:
         w.send(False)
 
@@ -214,7 +225,6 @@ if __name__ == '__main__':
     shield_design = 8
     mcEngine = 'TGeant4'
     simEngine = 'MuonBack'
-    outputDir = '.'
     sameSeed = 1
     theSeed = 1
     main()
