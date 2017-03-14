@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 import os
 import random
+import time
+from urlparse import urlparse
 import tempfile
 import numexpr as ne
 import subprocess
@@ -69,34 +71,45 @@ def worker(master):
     firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
     print id_, ego.pid, 'Produce', n, 'events starting with event', firstEvent
-    if os.path.isfile(worker_filename):
-        print worker_filename, 'exists.'
-    else:
-        f = r.TFile.Open(args.input)
-        tree = f.Get('pythia8-Geant4')
-        worker_file = r.TFile.Open(worker_filename, 'recreate')
-        worker_data = tree.CopyTree('', '', n, firstEvent)
-        worker_data.Write()
-        worker_file.Close()
+    # TODO how to do this on EOS?
+    # if os.path.isfile(worker_filename):
+    #     print worker_filename, 'exists.'
+    # else:
+    #     f = r.TFile.Open(args.input)
+    #     tree = f.Get('pythia8-Geant4')
+    #     worker_file = r.TFile.Open(worker_filename, 'recreate')
+    #     worker_data = tree.CopyTree('', '', n, firstEvent)
+    #     worker_data.Write()
+    #     worker_file.Close()
 
-    outFile = '{}/output_files/result_{}.root'.format(args.workDir, id_)
     while True:
         geoFile = master.recv()
         if not geoFile:
             break
-        subprocess.call(
-            [
-                './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
-                worker_filename, '-n', str(n), '--results', outFile, '--lofi'
-            ],
-            shell=False)
-        # TODO wait for result
-        f = r.TFile.Open(outFile)
-        xs = r.TVectorD()
-        f.ls()
-        xs.Read('results')
-        f.Close()
-        master.send([])
+        outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
+            args.workDir, os.path.basename(geoFile), id_
+        )
+        # subprocess.call(
+        #     [
+        #         './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
+        #         worker_filename, '-n', str(n), '--results', outFile, '--lofi'
+        #     ],
+        #     shell=False)
+        # TODO version for local
+        outFilePath = urlparse(outFile).path[1:]
+        while True:
+            if subprocess.call(
+                    ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', outFilePath]
+            ):
+                time.sleep(60)
+            else:
+                f = r.TFile.Open(outFile)
+                xs = r.TVectorD()
+                f.ls()
+                xs.Read('results')
+                f.Close()
+                master.send(xs)
+                break
     print 'Worker process {} done.'.format(id_)
 
 
@@ -214,7 +227,7 @@ def main():
         bounds,
         n_calls=20)
     print res
-    dump(res, "minimisation_result")
+    dump(res, 'minimisation_result')
     for w, _ in ps:
         w.send(False)
 
