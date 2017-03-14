@@ -63,9 +63,7 @@ def worker(master):
     id_ = master.recv()
     ego = current_process()
     worker_filename = (
-        'root://eoslhcb.cern.ch/'
-        '/eos/ship/user/olantwin/'
-        'skygrid/worker_files/{}/muons_{}.root').format(id_, args.njobs)
+        '{}/worker_files/muons_{}_{}.root').format(args.workDir, id_, args.njobs)
     n = (ntotal / args.njobs)
     firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
@@ -80,9 +78,7 @@ def worker(master):
         worker_data.Write()
         worker_file.Close()
 
-    outFile = ('root://eoslhcb.cern.ch/'
-               '/eos/ship/user/olantwin/skygrid/output_files/result_{}.root'
-              ).format(id_)
+    outFile = '{}/output_files/result_{}.root'.format(args.workDir, id_)
     while True:
         geoFile = master.recv()
         if not geoFile:
@@ -171,9 +167,7 @@ def main():
 
     def compute_FCN(params):
         geoFile = generate_geo(
-            'root://eoslhcb.cern.ch/'
-            '/eos/ship/user/olantwin/skygrid/'
-            'input_files/geo_{}.root'.format(compute_FCN.counter),
+            '{}/input_files/geo_{}.root'.format(args.workDir, compute_FCN.counter),
             params)
         out_, in_ = Pipe(duplex=False)
         geo_process = Process(target=get_geo, args=[geoFile, in_])
@@ -211,6 +205,11 @@ if __name__ == '__main__':
         default='root://eoslhcb.cern.ch/'
         '/eos/ship/data/Mbias/'
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
+    parser.add_argument(
+        '--workDir',
+        default='root://eoslhcb.cern.ch/'
+        '/eos/ship/user/olantwin/skygrid/'
+    )
     parser.add_argument(
         '-n',
         '--njobs',

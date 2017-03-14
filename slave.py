@@ -124,7 +124,7 @@ if __name__ == '__main__':
     )
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--jobid', type=int, required=True)
-    parser.add_argument('-n','--nEvents', type=int, default=None)
+    parser.add_argument('-n', '--nEvents', type=int, default=None)
     parser.add_argument('--lofi', action='store_true')
     args = parser.parse_args()
     main()
