@@ -1,6 +1,5 @@
 #!/usr/bin/env python2
 import os
-import random
 import time
 from urlparse import urlparse
 import tempfile
@@ -64,64 +63,85 @@ def FCN(W, x, L):
 def load_results(fileName):
     f = r.TFile.Open(fileName)
     xs = r.TVectorD()
+    # TODO handle key error explicitly instead of using fact that it's not
+    # fatal implicitly
     xs.Read('results')
     f.Close()
     return xs
 
 
 def retrieve_result(outFile):
-    print "Retrieving results from {}.".format(outFile)
+    print 'Retrieving results from {}.'.format(outFile)
     if args.local:
         pass
     else:
-        outFilePath = urlparse(outFile).path[1:]
         while True:
-            if subprocess.call(
-                    ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', outFilePath]
-            ):
-                time.sleep(60)
+            if not check_file(outFile):
+                time.sleep(60)  # Wait for job to finish
             else:
                 break
     return load_results(outFile)
 
 
+def check_file(fileName):
+    if args.local:
+        return os.path.isfile(fileName)
+    else:
+        parsedFileName = urlparse(fileName).path[1:]
+        # TODO get server from fileName instead of hardcoding?
+        return not bool(
+            subprocess.call(
+                ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', parsedFileName]))
+        # TODO Handle return code more strictly instead of casting to bool?
+
+
+def check_path(path):
+    if args.local:
+        return os.path.isdir(path)
+    else:
+        parsedPath = urlparse(path).path[1:]
+        # TODO get server from fileName instead of hardcoding?
+        return not bool(
+            subprocess.call(
+                ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', parsedPath]))
+        # TODO Handle return code more strictly instead of casting to bool?
+
+
 def worker(master):
     id_ = master.recv()
     ego = current_process()
-    worker_filename = (
-        '{}/worker_files/muons_{}_{}.root'
-    ).format(args.workDir, id_, args.njobs)
+    worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
+        args.workDir, id_, args.njobs)
     n = (ntotal / args.njobs)
     firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
     print id_, ego.pid, 'Produce', n, 'events starting with event', firstEvent
-    # TODO how to do this on EOS? Move to separate script and do manually?
-    # if os.path.isfile(worker_filename):
-    #     print worker_filename, 'exists.'
-    # else:
-    #     f = r.TFile.Open(args.input)
-    #     tree = f.Get('pythia8-Geant4')
-    #     worker_file = r.TFile.Open(worker_filename, 'recreate')
-    #     worker_data = tree.CopyTree('', '', n, firstEvent)
-    #     worker_data.Write()
-    #     worker_file.Close()
+    if check_file(worker_filename):
+        print worker_filename, 'exists.'
+    else:
+        f = r.TFile.Open(args.input)
+        tree = f.Get('pythia8-Geant4')
+        assert check_path(os.path.dirname(worker_filename))
+        worker_file = r.TFile.Open(worker_filename, 'recreate')
+        worker_data = tree.CopyTree('', '', n, firstEvent)
+        worker_data.Write()
+        worker_file.Close()
 
     while True:
         geoFile = master.recv()
         if not geoFile:
             break
         outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
-            args.workDir, os.path.basename(geoFile), id_
-        )
+            args.workDir, os.path.basename(geoFile), id_)
         if args.local:
             path = os.path.dirname(outFile)
             if not os.path.isdir(path):
                 os.makedirs(path)
             subprocess.call(
                 [
-                    './slave.py', '--geofile', geoFile, '--jobid',
-                    str(id_), '-f', worker_filename, '-n', str(n),
-                    '--results', outFile, '--lofi'
+                    './slave.py', '--geofile', geoFile, '--jobid', str(id_),
+                    '-f', worker_filename, '-n', str(n), '--results', outFile,
+                    '--lofi'
                 ],
                 shell=False)
         master.send(retrieve_result(outFile))
@@ -136,7 +156,7 @@ def get_geo(geoFile, out):
         muShieldDesign=shield_design,
         muShieldGeo=geoFile)
 
-    print "Config created with " + geoFile
+    print 'Config created with ' + geoFile
 
     with tempfile.NamedTemporaryFile() as t:
         run = r.FairRunSim()
@@ -180,7 +200,7 @@ def generate_geo(geofile, params):
     parray = r.TVectorD(len(params), np.array(params))
     parray.Write('params')
     f.Close()
-    print "Geofile constructed at " + geofile
+    print 'Geofile constructed at ' + geofile
     return geofile
 
 
@@ -193,14 +213,10 @@ def main():
 
     def compute_FCN(params):
         params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
-        geoFile = generate_geo(
-            '{}/input_files/geo_{}.root'.format(
-                args.workDir, compute_FCN.counter
-            ), params)
-        geoFileLocal = generate_geo(
-            '{}/input_files/geo_{}.root'.format(
-                '.', compute_FCN.counter
-            ), params) if not args.local else geoFile
+        geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
+            args.workDir, compute_FCN.counter), params)
+        geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
+            '.', compute_FCN.counter), params) if not args.local else geoFile
         out_, in_ = Pipe(duplex=False)
         geo_process = Process(target=get_geo, args=[geoFileLocal, in_])
         geo_process.start()
@@ -208,7 +224,7 @@ def main():
         for w, _ in ps:
             w.send(geoFile)
         xss = [w.recv() for w, _ in ps]
-        print "Received results. Processing..."
+        print 'Received results. Processing...'
         xs = [x for xs_ in xss for x in xs_]
         fcn = FCN(W, np.array(xs), L)
         assert np.isclose(L / 2., sum(params[:8]) +
@@ -219,10 +235,7 @@ def main():
 
     compute_FCN.counter = 11
     bounds = get_bounds()
-    res = gp_minimize(
-        compute_FCN,
-        bounds,
-        n_calls=20)
+    res = gp_minimize(compute_FCN, bounds, n_calls=20)
     print res
     dump(res, 'minimisation_result')
     for w, _ in ps:
@@ -242,8 +255,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--workDir',
         default='root://eoslhcb.cern.ch/'
-        '/eos/ship/user/olantwin/skygrid'
-    )
+        '/eos/ship/user/olantwin/skygrid')
     parser.add_argument(
         '-n',
         '--njobs',
@@ -252,8 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--local', action='store_true')
     args = parser.parse_args()
     assert args.local ^ ('root://' in args.workDir), (
-        "Please specify a local workDir if not working on EOS.\n"
-    )
+        'Please specify a local workDir if not working on EOS.\n')
     # ntotal = 17786274
     ntotal = 86229
     # TODO read total number from muon file directly
