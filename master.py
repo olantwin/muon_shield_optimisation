@@ -61,6 +61,30 @@ def FCN(W, x, L):
     return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
 
 
+def load_results(fileName):
+    f = r.TFile.Open(fileName)
+    xs = r.TVectorD()
+    xs.Read('results')
+    f.Close()
+    return xs
+
+
+def retrieve_result(outFile):
+    print "Retrieving results from {}.".format(outFile)
+    if args.local:
+        pass
+    else:
+        outFilePath = urlparse(outFile).path[1:]
+        while True:
+            if subprocess.call(
+                    ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', outFilePath]
+            ):
+                time.sleep(60)
+            else:
+                break
+    return load_results(outFile)
+
+
 def worker(master):
     id_ = master.recv()
     ego = current_process()
@@ -71,7 +95,7 @@ def worker(master):
     firstEvent = n * (id_ - 1)
     n += (ntotal % args.njobs if id_ == args.njobs else 0)
     print id_, ego.pid, 'Produce', n, 'events starting with event', firstEvent
-    # TODO how to do this on EOS?
+    # TODO how to do this on EOS? Move to separate script and do manually?
     # if os.path.isfile(worker_filename):
     #     print worker_filename, 'exists.'
     # else:
@@ -89,27 +113,18 @@ def worker(master):
         outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
             args.workDir, os.path.basename(geoFile), id_
         )
-        # subprocess.call(
-        #     [
-        #         './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
-        #         worker_filename, '-n', str(n), '--results', outFile, '--lofi'
-        #     ],
-        #     shell=False)
-        # TODO version for local
-        outFilePath = urlparse(outFile).path[1:]
-        while True:
-            if subprocess.call(
-                    ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', outFilePath]
-            ):
-                time.sleep(60)
-            else:
-                f = r.TFile.Open(outFile)
-                xs = r.TVectorD()
-                f.ls()
-                xs.Read('results')
-                f.Close()
-                master.send(xs)
-                break
+        if args.local:
+            path = os.path.dirname(outFile)
+            if not os.path.isdir(path):
+                os.makedirs(path)
+            subprocess.call(
+                [
+                    './slave.py', '--geofile', geoFile, '--jobid',
+                    str(id_), '-f', worker_filename, '-n', str(n),
+                    '--results', outFile, '--lofi'
+                ],
+                shell=False)
+        master.send(retrieve_result(outFile))
     print 'Worker process {} done.'.format(id_)
 
 
@@ -136,32 +151,6 @@ def get_geo(geoFile, out):
         L = magnetLength(muonShield)
         W = magnetMass(muonShield)
     out.send((L, W))
-
-
-def geo_guessr():
-    dZgap = 0.1 * u.m
-    zGap = 0.5 * dZgap  # halflengh of gap
-    dZ3 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    dZ4 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    dZ5 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    dZ6 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    dZ7 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    dZ8 = 0.2 * u.m + 3. * random.random() * u.m + zGap
-    params = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
-    for _ in range(8):
-        minimum = 0.1 * u.m
-        dXIn = minimum + 2.4 * random.random() * u.m
-        dXOut = minimum + 2.4 * random.random() * u.m
-        dYIn = minimum + 2.4 * random.random() * u.m
-        dYOut = minimum + 2.4 * random.random() * u.m
-        assert dXIn + dYIn <= 5. * u.m
-        assert dXOut + dYOut <= 5. * u.m
-        gapIn = 2. + 4.98 * random.random() * u.m
-        gapOut = 2. + 4.98 * random.random() * u.m
-        assert 2 * dXIn + gapIn <= 10. * u.m
-        assert 2 * dXOut + gapOut <= 10. * u.m
-        params += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
-    return params
 
 
 def get_bounds():
@@ -211,7 +200,7 @@ def main():
         geoFileLocal = generate_geo(
             '{}/input_files/geo_{}.root'.format(
                 '.', compute_FCN.counter
-            ), params) if not args.workDir == '.' else geoFile
+            ), params) if not args.local else geoFile
         out_, in_ = Pipe(duplex=False)
         geo_process = Process(target=get_geo, args=[geoFileLocal, in_])
         geo_process.start()
@@ -219,6 +208,7 @@ def main():
         for w, _ in ps:
             w.send(geoFile)
         xss = [w.recv() for w, _ in ps]
+        print "Received results. Processing..."
         xs = [x for xs_ in xss for x in xs_]
         fcn = FCN(W, np.array(xs), L)
         assert np.isclose(L / 2., sum(params[:8]) +
@@ -259,7 +249,11 @@ if __name__ == '__main__':
         '--njobs',
         type=int,
         default=min(8, cpu_count()), )
+    parser.add_argument('--local', action='store_true')
     args = parser.parse_args()
+    assert args.local ^ ('root://' in args.workDir), (
+        "Please specify a local workDir if not working on EOS.\n"
+    )
     # ntotal = 17786274
     ntotal = 86229
     # TODO read total number from muon file directly
