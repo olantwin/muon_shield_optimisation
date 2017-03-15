@@ -121,6 +121,8 @@ def get_geo(geoFile, out):
         muShieldDesign=shield_design,
         muShieldGeo=geoFile)
 
+    print "Config created with " + geoFile
+
     with tempfile.NamedTemporaryFile() as t:
         run = r.FairRunSim()
         run.SetName('TGeant4')  # Transport engine
@@ -189,6 +191,7 @@ def generate_geo(geofile, params):
     parray = r.TVectorD(len(params), np.array(params))
     parray.Write('params')
     f.Close()
+    print "Geofile constructed at " + geofile
     return geofile
 
 
@@ -205,8 +208,12 @@ def main():
             '{}/input_files/geo_{}.root'.format(
                 args.workDir, compute_FCN.counter
             ), params)
+        geoFileLocal = generate_geo(
+            '{}/input_files/geo_{}.root'.format(
+                '.', compute_FCN.counter
+            ), params) if not args.workDir == '.' else geoFile
         out_, in_ = Pipe(duplex=False)
-        geo_process = Process(target=get_geo, args=[geoFile, in_])
+        geo_process = Process(target=get_geo, args=[geoFileLocal, in_])
         geo_process.start()
         L, W = out_.recv()
         for w, _ in ps:
@@ -220,7 +227,7 @@ def main():
         print fcn
         return fcn
 
-    compute_FCN.counter = 0
+    compute_FCN.counter = 11
     bounds = get_bounds()
     res = gp_minimize(
         compute_FCN,
@@ -245,7 +252,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--workDir',
         default='root://eoslhcb.cern.ch/'
-        '/eos/ship/user/olantwin/skygrid/'
+        '/eos/ship/user/olantwin/skygrid'
     )
     parser.add_argument(
         '-n',
