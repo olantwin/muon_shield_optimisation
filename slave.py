@@ -105,7 +105,7 @@ def main():
         results = r.TVectorD(len(xs), np.array(xs))
         results.Write('results')
     res.Close()
-    print 'Worker process {} done.'.format(id_)
+    print 'Slave: Worker process {} done.'.format(id_)
 
 
 if __name__ == '__main__':

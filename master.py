@@ -7,8 +7,9 @@ import numexpr as ne
 import subprocess
 from multiprocessing import Pipe
 from multiprocessing import Process
+from multiprocessing import Pool
 from multiprocessing import cpu_count
-from multiprocessing import current_process
+from functools import partial
 import argparse
 import numpy as np
 from skopt import gp_minimize, dump
@@ -105,47 +106,25 @@ def check_path(path):
         # TODO Handle return code more strictly instead of casting to bool?
 
 
-def worker(master):
-    # TODO move to main process?
-    # TODO Without FariRunSim no need to have in separate process.
-    id_ = master.recv()
-    ego = current_process()
+def worker(id_, geoFile):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
-    n = (ntotal / args.njobs)
-    firstEvent = n * (id_ - 1)
-    n += (ntotal % args.njobs if id_ == args.njobs else 0)
-    print id_, ego.pid, 'Produce', n, 'events starting with event', firstEvent
-    if check_file(worker_filename):
-        print worker_filename, 'exists.'
-    else:
-        f = r.TFile.Open(args.input)
-        tree = f.Get('pythia8-Geant4')
-        assert check_path(os.path.dirname(worker_filename))
-        worker_file = r.TFile.Open(worker_filename, 'recreate')
-        worker_data = tree.CopyTree('', '', n, firstEvent)
-        worker_data.Write()
-        worker_file.Close()
-
-    while True:
-        geoFile = master.recv()
-        if not geoFile:
-            break
-        outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
-            args.workDir, os.path.basename(geoFile), id_)
-        if args.local:
-            path = os.path.dirname(outFile)
-            if not os.path.isdir(path):
-                os.makedirs(path)
-            subprocess.call(
-                [
-                    './slave.py', '--geofile', geoFile, '--jobid', str(id_),
-                    '-f', worker_filename, '-n', str(n), '--results', outFile,
-                    '--lofi'
-                ],
-                shell=False)
-        master.send(retrieve_result(outFile))
-    print 'Worker process {} done.'.format(id_)
+    n = (ntotal / args.njobs) + (ntotal % args.njobs
+                                 if id_ == args.njobs else 0)
+    outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
+        args.workDir, os.path.basename(geoFile), id_)
+    if args.local:
+        path = os.path.dirname(outFile)
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        subprocess.call(
+            [
+                './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
+                worker_filename, '-n', str(n), '--results', outFile, '--lofi'
+            ],
+            shell=False)
+    print 'Master: Worker process {} done.'.format(id_)
+    return retrieve_result(outFile)
 
 
 def get_geo(geoFile, out):
@@ -204,12 +183,28 @@ def generate_geo(geofile, params):
     return geofile
 
 
+def make_worker_file(id_):
+    worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
+        args.workDir, id_, args.njobs)
+    if check_file(worker_filename):
+        print worker_filename, 'exists.'
+    else:
+        print 'Creating workerfile: ', worker_filename
+        f = r.TFile.Open(args.input)
+        tree = f.Get('pythia8-Geant4')
+        assert check_path(os.path.dirname(worker_filename))
+        worker_file = r.TFile.Open(worker_filename, 'recreate')
+        n = (ntotal / args.njobs)
+        firstEvent = n * (id_ - 1)
+        n += (ntotal % args.njobs if id_ == args.njobs else 0)
+        worker_data = tree.CopyTree('', '', n, firstEvent)
+        worker_data.Write()
+        worker_file.Close()
+
+
 def main():
-    pipes = [Pipe(duplex=True) for _ in range(args.njobs)]
-    ps = [(w, Process(target=worker, args=[m])) for m, w in pipes]
-    for i, p in enumerate(ps):
-        p[1].start()
-        p[0].send(i + 1)
+    pool = Pool(processes=min(args.njobs, cpu_count()))
+    pool.map(make_worker_file, range(1, args.njobs + 1))
 
     def compute_FCN(params):
         params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
@@ -218,29 +213,28 @@ def main():
         geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
             '.', compute_FCN.counter), params) if not args.local else geoFile
         out_, in_ = Pipe(duplex=False)
+        ids = range(1, args.njobs + 1)
         geo_process = Process(target=get_geo, args=[geoFileLocal, in_])
         geo_process.start()
+        partial_worker = partial(worker, geoFile=geoFile)
+        results = pool.map(partial_worker, ids, 1)
         L, W = out_.recv()
-        for w, _ in ps:
-            w.send(geoFile)
-        xss = [w.recv() for w, _ in ps]
-        print 'Received results. Processing...'
-        xs = [x for xs_ in xss for x in xs_]
-        fcn = FCN(W, np.array(xs), L)
+        print 'Processing results...'
+        fcn = FCN(W, np.array(results), L)
         assert np.isclose(L / 2., sum(params[:8]) +
                           5), 'Analytical and ROOT lengths are not the same.'
         compute_FCN.counter += 1
         print fcn
         return fcn
 
-    compute_FCN.counter = 11
+    compute_FCN.counter = 57
     bounds = get_bounds()
-    res = gp_minimize(compute_FCN, bounds, n_calls=20)
+    res = gp_minimize(compute_FCN, bounds, n_calls=100)
     print res
     compute_FCN(res.x)
+    pool.close()
+    pool.join()
     dump(res, 'minimisation_result')
-    for w, _ in ps:
-        w.send(False)
 
 
 if __name__ == '__main__':
@@ -258,7 +252,7 @@ if __name__ == '__main__':
         default='root://eoslhcb.cern.ch/'
         '/eos/ship/user/olantwin/skygrid')
     parser.add_argument(
-        '-n',
+        '-j',
         '--njobs',
         type=int,
         default=min(8, cpu_count()), )
@@ -266,8 +260,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     assert args.local ^ ('root://' in args.workDir), (
         'Please specify a local workDir if not working on EOS.\n')
-    # ntotal = 17786274
-    ntotal = 86229
+    ntotal = 17786274  # full sample
+    # ntotal = 86229  # fast muons
     # TODO read total number from muon file directly
     dy = 10.
     vessel_design = 5
