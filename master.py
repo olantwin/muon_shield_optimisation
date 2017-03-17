@@ -87,11 +87,10 @@ def check_file(fileName):
     if args.local:
         return os.path.isfile(fileName)
     else:
-        parsedFileName = urlparse(fileName).path[1:]
-        # TODO get server from fileName instead of hardcoding?
+        parser_ = urlparse(fileName)
         return not bool(
             subprocess.call(
-                ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', parsedFileName]))
+                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]]))
         # TODO Handle return code more strictly instead of casting to bool?
 
 
@@ -99,15 +98,16 @@ def check_path(path):
     if args.local:
         return os.path.isdir(path)
     else:
-        parsedPath = urlparse(path).path[1:]
-        # TODO get server from fileName instead of hardcoding?
+        parser_ = urlparse(path)
         return not bool(
             subprocess.call(
-                ['xrdfs', 'root://eoslhcb.cern.ch', 'stat', parsedPath]))
+                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]]))
         # TODO Handle return code more strictly instead of casting to bool?
 
 
 def worker(master):
+    # TODO move to main process?
+    # TODO Without FariRunSim no need to have in separate process.
     id_ = master.recv()
     ego = current_process()
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
@@ -237,6 +237,7 @@ def main():
     bounds = get_bounds()
     res = gp_minimize(compute_FCN, bounds, n_calls=20)
     print res
+    compute_FCN(res.x)
     dump(res, 'minimisation_result')
     for w, _ in ps:
         w.send(False)
