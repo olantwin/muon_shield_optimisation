@@ -10,6 +10,7 @@ from multiprocessing import Process
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from functools import partial
+from itertools import ifilter
 import argparse
 import numpy as np
 from skopt import gp_minimize, dump
@@ -56,7 +57,7 @@ def FCN(W, x, L):
     L = shield length [cm]
 
     """
-    Sxi2 = ne.evaluate('sum(sqrt(560-(x+300.)/560))') if x else 0.
+    Sxi2 = ne.evaluate('sum(sqrt(560-(x+300.)/560))') if x.size else 0.
     print W, x, L, Sxi2
     return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
 
@@ -183,28 +184,44 @@ def generate_geo(geofile, params):
     return geofile
 
 
-def make_worker_file(id_):
+def check_worker_files(id_):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
     if check_file(worker_filename):
         print worker_filename, 'exists.'
     else:
-        print 'Creating workerfile: ', worker_filename
-        f = r.TFile.Open(args.input)
-        tree = f.Get('pythia8-Geant4')
-        assert check_path(os.path.dirname(worker_filename))
-        worker_file = r.TFile.Open(worker_filename, 'recreate')
-        n = (ntotal / args.njobs)
-        firstEvent = n * (id_ - 1)
-        n += (ntotal % args.njobs if id_ == args.njobs else 0)
-        worker_data = tree.CopyTree('', '', n, firstEvent)
-        worker_data.Write()
-        worker_file.Close()
+        return id_
+
+
+def make_worker_files(ids):
+    f = r.TFile.Open(args.input)
+    tree = f.Get('pythia8-Geant4')
+    for id_ in ids:
+        assert id_
+        worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
+            args.workDir, id_, args.njobs)
+        if check_file(worker_filename):
+            print worker_filename, 'exists.'
+        else:
+            print 'Creating workerfile: ', worker_filename
+            worker_file = r.TFile.Open(worker_filename, 'recreate')
+            n = (ntotal / args.njobs)
+            firstEvent = n * (id_ - 1)
+            n += (ntotal % args.njobs if id_ == args.njobs else 0)
+            worker_data = tree.CopyTree('', '', n, firstEvent)
+            worker_data.Write()
+            worker_file.Close()
+    f.Close()
 
 
 def main():
     pool = Pool(processes=min(args.njobs, cpu_count()))
-    pool.map(make_worker_file, range(1, args.njobs + 1))
+    assert check_path('{}/worker_files'.format(args.workDir))
+    ids = range(1, args.njobs + 1)
+    missing_files = pool.imap_unordered(check_worker_files, ids)
+    missing_ids = ifilter(None, missing_files)
+    print missing_ids
+    make_worker_files(missing_ids)
 
     def compute_FCN(params):
         params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
@@ -213,21 +230,23 @@ def main():
         geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
             '.', compute_FCN.counter), params) if not args.local else geoFile
         out_, in_ = Pipe(duplex=False)
-        ids = range(1, args.njobs + 1)
         geo_process = Process(target=get_geo, args=[geoFileLocal, in_])
         geo_process.start()
+        expected_time = 2400  # seconds
+        time.sleep(expected_time / 4)
         partial_worker = partial(worker, geoFile=geoFile)
-        results = pool.map(partial_worker, ids, 1)
+        results = pool.map(partial_worker, ids)
         L, W = out_.recv()
         print 'Processing results...'
-        fcn = FCN(W, np.array(results), L)
+        xs = [x for xs_ in results for x in xs_]
+        fcn = FCN(W, np.array(xs), L)
         assert np.isclose(L / 2., sum(params[:8]) +
                           5), 'Analytical and ROOT lengths are not the same.'
         compute_FCN.counter += 1
         print fcn
         return fcn
 
-    compute_FCN.counter = 57
+    compute_FCN.counter = 10
     bounds = get_bounds()
     res = gp_minimize(compute_FCN, bounds, n_calls=100)
     print res
