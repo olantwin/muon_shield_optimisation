@@ -78,10 +78,9 @@ def retrieve_result(outFile):
         pass
     else:
         while True:
-            if not check_file(outFile):
-                time.sleep(60)  # Wait for job to finish
-            else:
+            if check_file(outFile):
                 break
+            time.sleep(60)  # Wait for job to finish
     return load_results(outFile)
 
 
@@ -184,7 +183,7 @@ def generate_geo(geofile, params):
     return geofile
 
 
-def check_worker_files(id_):
+def check_worker_file(id_):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
     if check_file(worker_filename):
@@ -193,35 +192,47 @@ def check_worker_files(id_):
         return id_
 
 
-def make_worker_files(ids):
+f, tree = None, None
+
+
+def init_worker_files():
+    global f, tree
     f = r.TFile.Open(args.input)
     tree = f.Get('pythia8-Geant4')
-    for id_ in ids:
-        assert id_
-        worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
-            args.workDir, id_, args.njobs)
-        if check_file(worker_filename):
-            print worker_filename, 'exists.'
-        else:
-            print 'Creating workerfile: ', worker_filename
-            worker_file = r.TFile.Open(worker_filename, 'recreate')
-            n = (ntotal / args.njobs)
-            firstEvent = n * (id_ - 1)
-            n += (ntotal % args.njobs if id_ == args.njobs else 0)
-            worker_data = tree.CopyTree('', '', n, firstEvent)
-            worker_data.Write()
-            worker_file.Close()
-    f.Close()
+
+
+def make_worker_file(id_):
+    # requires init_worker_files to initialise worker process
+    assert id_
+    worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
+        args.workDir, id_, args.njobs)
+    if check_file(worker_filename):
+        print worker_filename, 'exists.'
+    else:
+        print 'Creating workerfile: ', worker_filename
+        worker_file = r.TFile.Open(worker_filename, 'recreate')
+        n = (ntotal / args.njobs)
+        firstEvent = n * (id_ - 1)
+        n += (ntotal % args.njobs if id_ == args.njobs else 0)
+        worker_data = tree.CopyTree('', '', n, firstEvent)
+        worker_data.Write()
+        worker_file.Close()
 
 
 def main():
-    pool = Pool(processes=min(args.njobs, cpu_count()))
+    pool = Pool(
+        processes=min(args.njobs, cpu_count()), initializer=init_worker_files)
     assert check_path('{}/worker_files'.format(args.workDir))
     ids = range(1, args.njobs + 1)
-    missing_files = pool.imap_unordered(check_worker_files, ids)
+    missing_files = pool.imap_unordered(check_worker_file, ids)
     missing_ids = ifilter(None, missing_files)
-    print missing_ids
-    make_worker_files(missing_ids)
+    pool.imap_unordered(make_worker_file, missing_ids)
+    pool.close()
+    pool.join()
+
+    pool = Pool(processes=min(args.njobs,
+                              cpu_count()
+                              if not args.local else 2 * cpu_count()))
 
     def compute_FCN(params):
         params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
@@ -246,7 +257,7 @@ def main():
         print fcn
         return fcn
 
-    compute_FCN.counter = 10
+    compute_FCN.counter = 20
     bounds = get_bounds()
     res = gp_minimize(compute_FCN, bounds, n_calls=100)
     print res
@@ -279,8 +290,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     assert args.local ^ ('root://' in args.workDir), (
         'Please specify a local workDir if not working on EOS.\n')
-    ntotal = 17786274  # full sample
-    # ntotal = 86229  # fast muons
+    ntotal = 17786274
+    if args.local:
+        args.input = './fast_muons.root'
+        ntotal = 86229
     # TODO read total number from muon file directly
     dy = 10.
     vessel_design = 5
