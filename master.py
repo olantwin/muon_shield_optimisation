@@ -2,11 +2,8 @@
 import os
 import time
 from urlparse import urlparse
-import tempfile
 import numexpr as ne
 import subprocess
-from multiprocessing import Pipe
-from multiprocessing import Process
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from functools import partial
@@ -93,7 +90,7 @@ def check_file(fileName):
             output = subprocess.check_output(
                 ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]])
             for line in output.split('\n'):
-                if "Size" in line:
+                if 'Size' in line:
                     size = line.split(' ')[-1]
                     return int(size) != 0
             print output
@@ -146,7 +143,7 @@ def get_geo(geoFile):
 
     print 'Config created with ' + geoFile
 
-    outFile = r.TMemFile("output", "create")
+    outFile = r.TMemFile('output', 'create')
     run = r.FairRunSim()
     run.SetName('TGeant4')
     run.SetOutputFile(outFile)
@@ -255,7 +252,7 @@ def compute_FCN(params):
     return fcn
 
 
-compute_FCN.counter = 24
+compute_FCN.counter = 121
 
 
 def main():
@@ -269,7 +266,72 @@ def main():
     pool.close()
     pool.join()
     bounds = get_bounds()
-    res = gp_minimize(compute_FCN, bounds, n_calls=100)
+    start = [
+        # Lengths:
+        2.0 * u.m + 5 * u.cm,
+        2.0 * u.m + 5 * u.cm,
+        2.75 * u.m + 5 * u.cm,
+        2.4 * u.m + 5 * u.cm,
+        3.0 * u.m + 5 * u.cm,
+        2.35 * u.m + 5 * u.cm,
+        # MagnAbsorb1:
+        0.4 * u.m,
+        0.4 * u.m,
+        1.5 * u.m,
+        1.5 * u.m,
+        0.02 * u.m,
+        0.02 * u.m,
+        # MagnAbsorb2:
+        0.8 * u.m,
+        0.8 * u.m,
+        1.5 * u.m,
+        1.5 * u.m,
+        0.02 * u.m,
+        0.02 * u.m,
+        # Magn1:
+        0.87 * u.m,
+        0.65 * u.m,
+        0.35 * u.m,
+        1.21 * u.m,
+        0.11 * u.m,
+        0.02 * u.m,
+        # Magn2:
+        0.65 * u.m,
+        0.43 * u.m,
+        1.21 * u.m,
+        2.07 * u.m,
+        0.11 * u.m,
+        0.02 * u.m,
+        # Magn3:
+        0.06 * u.m,
+        0.33 * u.m,
+        0.32 * u.m,
+        0.13 * u.m,
+        0.7 * u.m,
+        0.11 * u.m,
+        # Magn4:
+        0.05 * u.m,
+        0.16 * u.m,
+        1.12 * u.m,
+        0.05 * u.m,
+        0.04 * u.m,
+        0.02 * u.m,
+        # Magn5:
+        0.15 * u.m,
+        0.34 * u.m,
+        2.35 * u.m,
+        0.32 * u.m,
+        0.05 * u.m,
+        0.08 * u.m,
+        # Magn6:
+        0.31 * u.m,
+        0.9 * u.m,
+        1.86 * u.m,
+        3.1 * u.m,
+        0.02 * u.m,
+        0.55 * u.m,
+    ]
+    res = gp_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
     compute_FCN(res.x)
     pool.close()
