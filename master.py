@@ -89,10 +89,16 @@ def check_file(fileName):
         return os.path.isfile(fileName)
     else:
         parser_ = urlparse(fileName)
-        return not bool(
-            subprocess.call(
-                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]]))
-        # TODO Handle return code more strictly instead of casting to bool?
+        try:
+            output = subprocess.check_output(
+                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]])
+            for line in output.split('\n'):
+                if "Size" in line:
+                    size = line.split(' ')[-1]
+                    return int(size) != 0
+            print output
+        except subprocess.CalledProcessError:
+            return False
 
 
 def check_path(path):
@@ -100,10 +106,13 @@ def check_path(path):
         return os.path.isdir(path)
     else:
         parser_ = urlparse(path)
-        return not bool(
-            subprocess.call(
-                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]]))
-        # TODO Handle return code more strictly instead of casting to bool?
+        try:
+            subprocess.check_output(
+                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]])
+            return True
+        except subprocess.CalledProcessError as e:
+            print e.returncode, e.output
+            return False
 
 
 def worker(id_, geoFile):
@@ -137,18 +146,18 @@ def get_geo(geoFile, out):
 
     print 'Config created with ' + geoFile
 
-    with tempfile.NamedTemporaryFile() as t:
-        run = r.FairRunSim()
-        run.SetName('TGeant4')  # Transport engine
-        run.SetOutputFile(t.name)  # Output file
-        run.SetUserConfig('g4Config.C')
-        shipDet_conf.configure(run, ship_geo)
-        run.Init()
-        run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
-        sGeo = r.gGeoManager
-        muonShield = sGeo.GetVolume('MuonShieldArea')
-        L = magnetLength(muonShield)
-        W = magnetMass(muonShield)
+    outFile = r.TMemFile("output", "create")
+    run = r.FairRunSim()
+    run.SetName('TGeant4')
+    run.SetOutputFile(outFile)
+    run.SetUserConfig('g4Config.C')
+    shipDet_conf.configure(run, ship_geo)
+    run.Init()
+    run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
+    sGeo = r.gGeoManager
+    muonShield = sGeo.GetVolume('MuonShieldArea')
+    L = magnetLength(muonShield)
+    W = magnetMass(muonShield)
     out.send((L, W))
 
 
@@ -195,13 +204,13 @@ def check_worker_file(id_):
 f, tree = None, None
 
 
-def init_worker_files():
+def init_filemaker():
     global f, tree
     f = r.TFile.Open(args.input)
     tree = f.Get('pythia8-Geant4')
 
 
-def make_worker_file(id_):
+def filemaker(id_):
     # requires init_worker_files to initialise worker process
     assert id_
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
@@ -221,12 +230,12 @@ def make_worker_file(id_):
 
 def main():
     pool = Pool(
-        processes=min(args.njobs, cpu_count()), initializer=init_worker_files)
+        processes=min(args.njobs, cpu_count()), initializer=init_filemaker)
     assert check_path('{}/worker_files'.format(args.workDir))
     ids = range(1, args.njobs + 1)
     missing_files = pool.imap_unordered(check_worker_file, ids)
     missing_ids = ifilter(None, missing_files)
-    pool.imap_unordered(make_worker_file, missing_ids)
+    pool.imap_unordered(filemaker, missing_ids)
     pool.close()
     pool.join()
 
@@ -234,7 +243,7 @@ def main():
                               cpu_count()
                               if not args.local else 2 * cpu_count()))
 
-    def compute_FCN(params):
+    def compute_FCN(params):  # TODO make proper function
         params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
         geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
             args.workDir, compute_FCN.counter), params)
@@ -257,7 +266,7 @@ def main():
         print fcn
         return fcn
 
-    compute_FCN.counter = 20
+    compute_FCN.counter = 24
     bounds = get_bounds()
     res = gp_minimize(compute_FCN, bounds, n_calls=100)
     print res

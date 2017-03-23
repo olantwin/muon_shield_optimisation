@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
-import os
-import tempfile
 import argparse
+import tempfile
 import ROOT as r
 import shipunit as u
 import numpy as np
@@ -79,9 +78,10 @@ def main():
     # TODO always pass from steering process?
 
     with tempfile.NamedTemporaryFile() as t:
-        generate(args.input, args.geofile, n, t.name, args.lofi)
+        outFile = t.name
+        generate(args.input, args.geofile, n, outFile, args.lofi)
         ch = r.TChain('cbmsim')
-        ch.Add(t.name)
+        ch.Add(outFile)
         xs = []
         mom = r.TVector3()
         for event in ch:
