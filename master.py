@@ -136,7 +136,7 @@ def worker(id_, geoFile):
     return retrieve_result(outFile)
 
 
-def get_geo(geoFile, out):
+def get_geo(geoFile):
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=dy,
@@ -158,7 +158,7 @@ def get_geo(geoFile, out):
     muonShield = sGeo.GetVolume('MuonShieldArea')
     L = magnetLength(muonShield)
     W = magnetMass(muonShield)
-    out.send((L, W))
+    return L, W
 
 
 def get_bounds():
@@ -228,6 +228,36 @@ def filemaker(id_):
         worker_file.Close()
 
 
+def compute_FCN(params):
+    params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
+    geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
+        args.workDir, compute_FCN.counter), params)
+    geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
+        '.', compute_FCN.counter), params) if not args.local else geoFile
+    pool = Pool(processes=min(args.njobs,
+                              cpu_count()
+                              if not args.local else 2 * cpu_count()))
+    geo_result = pool.apply_async(get_geo, [geoFileLocal])
+    if not args.local:
+        expected_time = 2400  # seconds
+        time.sleep(expected_time / 4)
+    partial_worker = partial(worker, geoFile=geoFile)
+    ids = range(1, args.njobs + 1)
+    results = pool.map(partial_worker, ids)
+    L, W = geo_result.get()
+    print 'Processing results...'
+    xs = [x for xs_ in results for x in xs_]
+    fcn = FCN(W, np.array(xs), L)
+    assert np.isclose(L / 2., sum(params[:8]) +
+                      5), 'Analytical and ROOT lengths are not the same.'
+    compute_FCN.counter += 1
+    print fcn
+    return fcn
+
+
+compute_FCN.counter = 24
+
+
 def main():
     pool = Pool(
         processes=min(args.njobs, cpu_count()), initializer=init_filemaker)
@@ -238,35 +268,6 @@ def main():
     pool.imap_unordered(filemaker, missing_ids)
     pool.close()
     pool.join()
-
-    pool = Pool(processes=min(args.njobs,
-                              cpu_count()
-                              if not args.local else 2 * cpu_count()))
-
-    def compute_FCN(params):  # TODO make proper function
-        params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
-        geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
-            args.workDir, compute_FCN.counter), params)
-        geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
-            '.', compute_FCN.counter), params) if not args.local else geoFile
-        out_, in_ = Pipe(duplex=False)
-        geo_process = Process(target=get_geo, args=[geoFileLocal, in_])
-        geo_process.start()
-        expected_time = 2400  # seconds
-        time.sleep(expected_time / 4)
-        partial_worker = partial(worker, geoFile=geoFile)
-        results = pool.map(partial_worker, ids)
-        L, W = out_.recv()
-        print 'Processing results...'
-        xs = [x for xs_ in results for x in xs_]
-        fcn = FCN(W, np.array(xs), L)
-        assert np.isclose(L / 2., sum(params[:8]) +
-                          5), 'Analytical and ROOT lengths are not the same.'
-        compute_FCN.counter += 1
-        print fcn
-        return fcn
-
-    compute_FCN.counter = 24
     bounds = get_bounds()
     res = gp_minimize(compute_FCN, bounds, n_calls=100)
     print res
