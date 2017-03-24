@@ -89,17 +89,15 @@ def main():
                 if hit:
                     if not hit.GetEnergyLoss() > 0:
                         continue
-                    if hit.GetDetectorID() / 10000000 == 4 and abs(hit.PdgCode(
-                    )) == 13:
+                    pid = hit.PdgCode()
+                    if hit.GetDetectorID() / 10000000 == 4 and abs(pid) == 13:
                         hit.Momentum(mom)
                         P = mom.Mag() / u.GeV
                         y = hit.GetY()
                         x = hit.GetX()
-                        if (
-                                P > 1 and abs(y) < 5 * u.m and
-                                (x < 2.6 * u.m and x > -3 * u.m)
-                        ):
-                            xs.append(x)
+                        if (P > 1 and abs(y) < 5 * u.m and
+                                (x < 2.6 * u.m and x > -3 * u.m)):
+                            xs.append(- pid * x / 13.)
     res = r.TFile.Open(args.results, 'recreate')
     if xs:
         results = r.TVectorD(len(xs), np.array(xs))
@@ -120,8 +118,7 @@ if __name__ == '__main__':
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument(
         '--results',
-        default='root://eoslhcb.cern.ch//eos/ship/user/olantwin/test.root'
-    )
+        default='root://eoslhcb.cern.ch//eos/ship/user/olantwin/test.root')
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--jobid', type=int, required=True)
     parser.add_argument('-n', '--nEvents', type=int, default=None)
