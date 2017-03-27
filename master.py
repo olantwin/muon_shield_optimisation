@@ -93,7 +93,7 @@ def get_bounds():
     dZ7 = (20. + zGap, 300. + zGap)
     dZ8 = (20. + zGap, 300. + zGap)
     bounds = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
-    for _ in range(8):
+    for _ in range(2):
         minimum = 10.
         dXIn = (minimum, 250.)
         dXOut = (minimum, 250.)
@@ -152,7 +152,53 @@ def filemaker(id_, local):
 
 def compute_FCN(params, lofi=False, backend='skygrid'):
     local = backend == 'local'
-    params = [70., 170.] + params  # Add constant parameters
+    params = [70., 170.] + params[:6] + [
+        # MagnAbsorb1:
+        40.,
+        40.,
+        150.,
+        150.,
+        2.,
+        2.,
+        # MagnAbsorb2:
+        80.,
+        80.,
+        150.,
+        150.,
+        2.,
+        2.,
+    ] + params[6:] + [
+        # Magn3:
+        6.,
+        33.,
+        32.,
+        13.,
+        70.,
+        11.,
+        # Magn4:
+        5.,
+        16.,
+        112.,
+        5.,
+        4.,
+        2.,
+        # Magn5:
+        15.,
+        34.,
+        235.,
+        32.,
+        5.,
+        8.,
+        # Magn6:
+        31.,
+        90.,
+        186.,
+        310.,
+        2.,
+        55.,
+    ]
+
+    # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
     geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
@@ -213,26 +259,12 @@ def main():
     start = [
         # Units all in cm
         # Lengths:
-        200. + 5.,
-        200. + 5.,
-        275. + 5.,
-        240. + 5.,
-        300. + 5.,
-        235. + 5.,
-        # MagnAbsorb1:
-        40.,
-        40.,
-        150.,
-        150.,
-        2.,
-        2.,
-        # MagnAbsorb2:
-        80.,
-        80.,
-        150.,
-        150.,
-        2.,
-        2.,
+        (200. + 5.) / 2.,
+        (200. + 5.) / 2.,
+        (275. + 5.) / 2.,
+        (240. + 5.) / 2.,
+        (300. + 5.) / 2.,
+        (235. + 5.) / 2.,
         # Magn1:
         87.,
         65.,
@@ -247,34 +279,6 @@ def main():
         207.,
         11.,
         2.,
-        # Magn3:
-        6.,
-        33.,
-        32.,
-        13.,
-        70.,
-        11.,
-        # Magn4:
-        5.,
-        16.,
-        112.,
-        5.,
-        4.,
-        2.,
-        # Magn5:
-        15.,
-        34.,
-        235.,
-        32.,
-        5.,
-        8.,
-        # Magn6:
-        31.,
-        90.,
-        186.,
-        310.,
-        2.,
-        55.,
     ]
     res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
