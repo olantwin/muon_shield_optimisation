@@ -252,10 +252,12 @@ def compute_FCN(params):
     assert np.isclose(
         L / 2.,
         sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
-    compute_FCN.counter += 1
     print fcn
     with open('geo/fcns.csv', 'a') as f:
-        f.write('{},{},{}\n'.format(compute_FCN.counter, fcn, len(xs)))
+        f.write('{},{},{},{},{},{} \n'.format(
+            compute_FCN.counter, fcn, L, W, sum(xs), len(xs)
+        ))
+    compute_FCN.counter += 1
     return fcn
 
 
