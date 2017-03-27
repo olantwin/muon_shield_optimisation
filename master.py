@@ -2,13 +2,13 @@
 import os
 import time
 from urlparse import urlparse
-import numexpr as ne
 import subprocess
 from multiprocessing import Pool
 from multiprocessing import cpu_count
 from functools import partial
 from itertools import ifilter
 import argparse
+import numexpr as ne
 import numpy as np
 from skopt import gp_minimize, dump
 import ROOT as r
@@ -76,9 +76,8 @@ def retrieve_result(outFile):
     else:
         while True:
             if check_file(outFile):
-                break
+                return load_results(outFile)
             time.sleep(60)  # Wait for job to finish
-    return load_results(outFile)
 
 
 def check_file(fileName):
@@ -92,6 +91,8 @@ def check_file(fileName):
             for line in output.split('\n'):
                 if 'Size' in line:
                     size = line.split(' ')[-1]
+                    if int(size) != 0:
+                        print output
                     return int(size) != 0
             print output
         except subprocess.CalledProcessError:
@@ -232,8 +233,7 @@ def compute_FCN(params):
     geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
         '.', compute_FCN.counter), params) if not args.local else geoFile
     pool = Pool(processes=min(args.njobs,
-                              cpu_count()
-                              if not args.local else 2 * cpu_count()))
+                              cpu_count() if args.local else 2 * cpu_count()))
     geo_result = pool.apply_async(get_geo, [geoFileLocal])
     if not args.local:
         expected_time = 2400  # seconds
@@ -241,18 +241,25 @@ def compute_FCN(params):
     partial_worker = partial(worker, geoFile=geoFile)
     ids = range(1, args.njobs + 1)
     results = pool.map(partial_worker, ids)
+    print results
     L, W = geo_result.get()
     print 'Processing results...'
-    xs = [x for xs_ in results for x in xs_]
+    flat_results = [xs_ for xs_ in results]
+    flat_results = ifilter(None, flat_results)
+    print flat_results
+    xs = [x for x in flat_results]
     fcn = FCN(W, np.array(xs), L)
-    assert np.isclose(L / 2., sum(params[:8]) +
-                      5), 'Analytical and ROOT lengths are not the same.'
+    assert np.isclose(
+        L / 2.,
+        sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
     compute_FCN.counter += 1
     print fcn
+    with open('geo/fcns.csv', 'a') as f:
+        f.write('{},{},{}\n'.format(compute_FCN.counter, fcn, len(xs)))
     return fcn
 
 
-compute_FCN.counter = 121
+compute_FCN.counter = 107
 
 
 def main():
