@@ -5,8 +5,8 @@ from urlparse import urlparse
 import subprocess
 from multiprocessing import Pool
 from multiprocessing import cpu_count
-from functools import partial
 from itertools import ifilter
+from functools import partial
 import argparse
 import numpy as np
 from skopt import forest_minimize, dump
@@ -203,18 +203,9 @@ def compute_FCN(params, lofi=False, backend='skygrid'):
         args.workDir, compute_FCN.counter), params)
     geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
         '.', compute_FCN.counter), params) if not local else geoFile
-    pool = Pool(processes=min(args.njobs,
-                              cpu_count() - 1 if local else 2 * cpu_count() - 2))
-    geo_result = pool.apply_async(get_geo, [geoFileLocal])
-    if not local:
-        expected_time = 2400  # seconds
-        time.sleep(expected_time / 4)
-    partial_worker = partial(worker, geoFile=geoFile, lofi=lofi)
-    ids = range(1, args.njobs + 1)
-    results = pool.map(partial_worker, ids)
-    L, W = geo_result.get()
-    print 'Processing results...'
-    xs = [x for xs in results for x in xs]
+    pool = Pool(processes=1)
+    L, W = pool.apply(get_geo, [geoFileLocal])
+    xs = []
     fcn = FCN(W, np.array(xs), L)
     assert np.isclose(
         L / 2.,
@@ -231,7 +222,7 @@ def compute_FCN(params, lofi=False, backend='skygrid'):
     return fcn
 
 
-compute_FCN.counter = 107
+compute_FCN.counter = 224
 
 
 def main():
