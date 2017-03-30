@@ -10,7 +10,7 @@ from itertools import ifilter
 import argparse
 import numexpr as ne
 import numpy as np
-from skopt import gp_minimize, dump
+from skopt import forest_minimize, dump
 import ROOT as r
 import shipunit as u
 from ShipGeoConfig import ConfigRegistry
@@ -340,7 +340,7 @@ def main():
         0.02 * u.m,
         0.55 * u.m,
     ]
-    res = gp_minimize(compute_FCN, bounds, x0=start, n_calls=100)
+    res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
     compute_FCN(res.x)
     pool.close()
