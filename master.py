@@ -8,55 +8,13 @@ from multiprocessing import cpu_count
 from functools import partial
 from itertools import ifilter
 import argparse
-import numexpr as ne
 import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
 import shipunit as u
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
-
-
-def magnetMass(muonShield):
-    """Calculate magnet weight [kg]
-
-    Assumes magnets contained in `MuonShieldArea` TGeoVolumeAssembly and
-    contain `Magn` in their name. Calculation is done analytically by
-    the TGeoVolume class.
-
-    """
-    nodes = muonShield.GetNodes()
-    m = 0.
-    for node in nodes:
-        volume = node.GetVolume()
-        if 'Magn' in volume.GetName():
-            m += volume.Weight(0.01, 'a')
-    return m
-
-
-def magnetLength(muonShield):
-    """Ask TGeoShapeAssembly for magnet length [cm]
-
-    Note: Ignores one of the gaps before or after the magnet
-
-    Also note: TGeoShapeAssembly::GetDZ() returns a half-length
-
-    """
-    length = 2 * muonShield.GetShape().GetDZ()
-    return length
-
-
-def FCN(W, x, L):
-    """Calculate penalty function.
-
-    W = weight [kg]
-    x = array of positions of muon hits in bending plane [cm]
-    L = shield length [cm]
-
-    """
-    Sxi2 = ne.evaluate('sum(sqrt(560-(x+300.)/560))') if x.size else 0.
-    print W, x, L, Sxi2
-    return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
+from common import magnetMass, magnetLength, FCN
 
 
 def load_results(fileName):
@@ -257,6 +215,9 @@ def compute_FCN(params):
         f.write('{},{},{},{},{},{} \n'.format(
             compute_FCN.counter, fcn, L, W, sum(xs), len(xs)
         ))
+    pool.close()
+    pool.join()
+    del pool
     compute_FCN.counter += 1
     return fcn
 
@@ -274,6 +235,7 @@ def main():
     pool.imap_unordered(filemaker, missing_ids)
     pool.close()
     pool.join()
+    del pool
     bounds = get_bounds()
     start = [
         # Lengths:
@@ -343,8 +305,6 @@ def main():
     res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
     compute_FCN(res.x)
-    pool.close()
-    pool.join()
     dump(res, 'minimisation_result')
 
 
