@@ -94,10 +94,10 @@ def main():
                         hit.Momentum(mom)
                         P = mom.Mag() / u.GeV
                         y = hit.GetY()
-                        x = - pid * hit.GetX() / 13.
+                        x = pid * hit.GetX() / 13.
                         if (P > 1 and abs(y) < 5 * u.m and
                                 (x < 2.6 * u.m and x > -3 * u.m)):
-                            xs.append(- pid * x / 13.)
+                            xs.append(x)
     res = r.TFile.Open(args.results, 'recreate')
     if xs:
         results = r.TVectorD(len(xs), np.array(xs))
