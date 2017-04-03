@@ -45,7 +45,7 @@ def check_file(fileName):
         parser_ = urlparse(fileName)
         try:
             output = subprocess.check_output(
-                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]])
+                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:], '-q', 'IsReadable'])
             for line in output.split('\n'):
                 if 'Size' in line:
                     size = line.split(' ')[-1]
