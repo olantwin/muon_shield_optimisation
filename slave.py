@@ -9,7 +9,7 @@ from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
 
 
-def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
+def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
     firstEvent = 0
     dy = 10.
     vessel_design = 5
@@ -21,7 +21,7 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
     # provisionally for making studies of various muon background sources
     inactivateMuonProcesses = lofi
     phiRandom = False  # only relevant for muon background generator
-    followMuon = False  # only transport muons for a fast muon only background
+    followMuon = True  # only transport muons for a fast muon only background
 
     print 'FairShip setup to produce', nEvents, 'events'
     r.gRandom.SetSeed(theSeed)
@@ -53,9 +53,7 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=True):
     run.SetGenerator(primGen)
     run.SetStoreTraj(r.kFALSE)
     run.Init()
-    if hasattr(ship_geo, 'muShieldDesign'):
-        if ship_geo.muShieldDesign != 1:
-            geomGeant4.setMagnetField()
+    geomGeant4.setMagnetField()
     if inactivateMuonProcesses:
         mygMC = r.TGeant4.GetMC()
         mygMC.ProcessGeantCommand('/process/inactivate muPairProd')
@@ -85,12 +83,12 @@ def main():
         xs = []
         mom = r.TVector3()
         for event in ch:
-            for hit in event.strawtubesPoint:
+            for hit in event.vetoPoint:
                 if hit:
-                    if not hit.GetEnergyLoss() > 0:
+                    if (not hit.GetEnergyLoss() > 0) and (not args.lofi):
                         continue
                     pid = hit.PdgCode()
-                    if hit.GetDetectorID() / 10000000 == 4 and abs(pid) == 13:
+                    if hit.GetZ() > 2597 and hit.GetZ() < 2599 and abs(pid) == 13:
                         hit.Momentum(mom)
                         P = mom.Mag() / u.GeV
                         y = hit.GetY()
