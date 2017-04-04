@@ -18,24 +18,23 @@ from common import magnetMass, magnetLength, FCN
 
 
 def load_results(fileName):
-    f = r.TFile.Open(fileName)
-    xs = r.TVectorD()
+    file_ = r.TFile.Open(fileName)
+    xs = r.std.vector('double')()
     # TODO handle key error explicitly instead of using fact that it's not
     # fatal implicitly
-    xs.Read('results')
-    f.Close()
+    file_.GetObject("results", xs)
+    file_.Close()
     return xs
 
 
 def retrieve_result(outFile):
     print 'Retrieving results from {}.'.format(outFile)
-    if args.local:
-        pass
-    else:
+    if not args.local:
         while True:
             if check_file(outFile):
-                return load_results(outFile)
+                break
             time.sleep(60)  # Wait for job to finish
+    return load_results(outFile)
 
 
 def check_file(fileName):
@@ -199,13 +198,9 @@ def compute_FCN(params):
     partial_worker = partial(worker, geoFile=geoFile)
     ids = range(1, args.njobs + 1)
     results = pool.map(partial_worker, ids)
-    print results
     L, W = geo_result.get()
     print 'Processing results...'
-    flat_results = [xs_ for xs_ in results]
-    flat_results = ifilter(None, flat_results)
-    print flat_results
-    xs = [x for x in flat_results]
+    xs = [x for xs in results for x in xs]
     fcn = FCN(W, np.array(xs), L)
     assert np.isclose(
         L / 2.,

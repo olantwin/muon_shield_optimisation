@@ -75,12 +75,12 @@ def main():
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
 
+    xs = r.std.vector('double')()
     with tempfile.NamedTemporaryFile() as t:
         outFile = t.name
         generate(args.input, args.geofile, n, outFile, args.lofi)
         ch = r.TChain('cbmsim')
         ch.Add(outFile)
-        xs = []
         mom = r.TVector3()
         for event in ch:
             for hit in event.vetoPoint:
@@ -95,11 +95,9 @@ def main():
                         x = pid * hit.GetX() / 13.
                         if (P > 1 and abs(y) < 5 * u.m and
                                 (x < 2.6 * u.m and x > -3 * u.m)):
-                            xs.append(x)
+                            xs.push_back(x)
     res = r.TFile.Open(args.results, 'recreate')
-    if xs:
-        results = r.TVectorD(len(xs), np.array(xs))
-        results.Write('results')
+    res.WriteObject(xs, "results")
     res.Close()
     print 'Slave: Worker process {} done.'.format(id_)
 
