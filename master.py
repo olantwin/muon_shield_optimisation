@@ -37,14 +37,16 @@ def retrieve_result(outFile):
     return load_results(outFile)
 
 
-def check_file(fileName):
+def check_file(fileName, strict=True):
     if args.local:
         return os.path.isfile(fileName)
     else:
         parser_ = urlparse(fileName)
         try:
-            output = subprocess.check_output(
-                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:], '-q', 'IsReadable'])
+            command = ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]]
+            if strict:
+                command += ['-q', 'IsReadable']
+            output = subprocess.check_output(command)
             for line in output.split('\n'):
                 if 'Size' in line:
                     size = line.split(' ')[-1]
@@ -150,7 +152,7 @@ def generate_geo(geofile, params):
 def check_worker_file(id_):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
-    if check_file(worker_filename):
+    if check_file(worker_filename, strict=False):
         print worker_filename, 'exists.'
     else:
         return id_
@@ -190,7 +192,7 @@ def compute_FCN(params):
     geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
         '.', compute_FCN.counter), params) if not args.local else geoFile
     pool = Pool(processes=min(args.njobs,
-                              cpu_count() if args.local else 2 * cpu_count()))
+                              cpu_count() - 1 if args.local else 2 * cpu_count() - 2))
     geo_result = pool.apply_async(get_geo, [geoFileLocal])
     if not args.local:
         expected_time = 2400  # seconds
@@ -222,10 +224,14 @@ compute_FCN.counter = 107
 
 def main():
     pool = Pool(
-        processes=min(args.njobs, cpu_count()), initializer=init_filemaker)
+        processes=min(args.njobs, cpu_count()))
     assert check_path('{}/worker_files'.format(args.workDir))
     ids = range(1, args.njobs + 1)
     missing_files = pool.imap_unordered(check_worker_file, ids)
+    pool.close()
+    pool.join()
+    pool = Pool(
+        processes=min(args.njobs, cpu_count()), initializer=init_filemaker)
     missing_ids = ifilter(None, missing_files)
     pool.imap_unordered(filemaker, missing_ids)
     pool.close()
