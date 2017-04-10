@@ -1,12 +1,13 @@
 #!/usr/bin/env python2
 import argparse
 import tempfile
+import numpy as np
 import ROOT as r
 import shipunit as u
-import numpy as np
 import geomGeant4
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
+import rootUtils as ut
 
 
 def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
@@ -70,11 +71,17 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
 
 
 def main():
+    h = {}
     id_ = args.jobid
     n = args.nEvents if args.nEvents else 100000
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
 
+    ut.bookHist(h, 'mu_pos', '#mu- hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
+    ut.bookHist(h, 'anti-mu_pos', '#mu+ hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
+    ut.bookHist(h, 'mu_w_pos', '#mu- hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
+    ut.bookHist(h, 'anti-mu_w_pos', '#mu+ hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
+    ut.bookHist(h, 'mu_p', '#mu+-;p[GeV];', 100, 0, 350)
     xs = r.std.vector('double')()
     with tempfile.NamedTemporaryFile() as t:
         outFile = t.name
@@ -92,11 +99,23 @@ def main():
                         hit.Momentum(mom)
                         P = mom.Mag() / u.GeV
                         y = hit.GetY()
-                        x = pid * hit.GetX() / 13.
+                        x = hit.GetX()
+                        if pid == 13:
+                            h['mu_pos'].Fill(x, y)
+                        else:
+                            h['anti-mu_pos'].Fill(x, y)
+                        x *= pid / 13.
                         if (P > 1 and abs(y) < 5 * u.m and
                                 (x < 2.6 * u.m and x > -3 * u.m)):
                             xs.push_back(x)
-    res = r.TFile.Open(args.results, 'recreate')
+                            w = np.sqrt(500.-(x+300.)/560.)
+                            h['mu_p'].Fill(P)
+                            if pid == 13:
+                                h['mu_w_pos'].Fill(x, y, w)
+                            else:
+                                h['anti-mu_w_pos'].Fill(-x, y, w)
+    ut.writeHists(h, args.results)
+    res = r.TFile.Open(args.results, 'update')
     res.WriteObject(xs, "results")
     res.Close()
     print 'Slave: Worker process {} done.'.format(id_)
@@ -114,7 +133,7 @@ if __name__ == '__main__':
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument(
         '--results',
-        default='root://eoslhcb.cern.ch//eos/ship/user/olantwin/test.root')
+        default='test.root')
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--jobid', type=int, required=True)
     parser.add_argument('-n', '--nEvents', type=int, default=None)
