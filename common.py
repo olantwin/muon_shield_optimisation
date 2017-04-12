@@ -1,5 +1,8 @@
+import os
 import numexpr as ne
 import ROOT as r
+from ShipGeoConfig import ConfigRegistry
+import shipDet_conf
 
 
 def FCN(W, x, L):
@@ -53,3 +56,28 @@ def load_results(fileName):
     f.GetObject("results", xs)
     f.Close()
     return xs
+
+
+def get_geo(geoFile):
+    ship_geo = ConfigRegistry.loadpy(
+        '$FAIRSHIP/geometry/geometry_config.py',
+        Yheight=10,
+        tankDesign=5,
+        muShieldDesign=8,
+        muShieldGeo=geoFile)
+
+    print 'Config created with ' + geoFile
+
+    outFile = r.TMemFile('output', 'create')
+    run = r.FairRunSim()
+    run.SetName('TGeant4')
+    run.SetOutputFile(outFile)
+    run.SetUserConfig('g4Config.C')
+    shipDet_conf.configure(run, ship_geo)
+    run.Init()
+    run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
+    sGeo = r.gGeoManager
+    muonShield = sGeo.GetVolume('MuonShieldArea')
+    L = magnetLength(muonShield)
+    W = magnetMass(muonShield)
+    return L, W

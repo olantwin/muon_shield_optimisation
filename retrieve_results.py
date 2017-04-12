@@ -8,35 +8,7 @@ from multiprocessing import cpu_count
 from functools import partial
 import argparse
 import numpy as np
-import ROOT as r
-from ShipGeoConfig import ConfigRegistry
-import shipDet_conf
-from common import magnetMass, magnetLength, FCN, load_results
-
-
-def get_geo(geoFile):
-    ship_geo = ConfigRegistry.loadpy(
-        '$FAIRSHIP/geometry/geometry_config.py',
-        Yheight=dy,
-        tankDesign=vessel_design,
-        muShieldDesign=shield_design,
-        muShieldGeo=geoFile)
-
-    print 'Config created with ' + geoFile
-
-    outFile = r.TMemFile('output', 'create')
-    run = r.FairRunSim()
-    run.SetName('TGeant4')
-    run.SetOutputFile(outFile)
-    run.SetUserConfig('g4Config.C')
-    shipDet_conf.configure(run, ship_geo)
-    run.Init()
-    run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
-    sGeo = r.gGeoManager
-    muonShield = sGeo.GetVolume('MuonShieldArea')
-    L = magnetLength(muonShield)
-    W = magnetMass(muonShield)
-    return L, W
+from common import  FCN, load_results, get_geo
 
 
 def worker(id_, geoFile):
@@ -99,7 +71,4 @@ if __name__ == '__main__':
         type=int,
         default=min(8, cpu_count()), )
     args = parser.parse_args()
-    dy = 10.
-    vessel_design = 5
-    shield_design = 8
     main()

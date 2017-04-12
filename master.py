@@ -12,9 +12,7 @@ import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
 import shipunit as u
-from ShipGeoConfig import ConfigRegistry
-import shipDet_conf
-from common import magnetMass, magnetLength, FCN, load_results
+from common import FCN, load_results, get_geo
 
 
 def retrieve_result(outFile):
@@ -76,36 +74,11 @@ def worker(id_, geoFile):
         subprocess.call(
             [
                 './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
-                worker_filename, '-n', str(n), '--results', outFile, '--lofi'
+                worker_filename, '-n', str(n), '--results', outFile#, '--lofi'
             ],
             shell=False)
     print 'Master: Worker process {} done.'.format(id_)
     return retrieve_result(outFile)
-
-
-def get_geo(geoFile):
-    ship_geo = ConfigRegistry.loadpy(
-        '$FAIRSHIP/geometry/geometry_config.py',
-        Yheight=dy,
-        tankDesign=vessel_design,
-        muShieldDesign=shield_design,
-        muShieldGeo=geoFile)
-
-    print 'Config created with ' + geoFile
-
-    outFile = r.TMemFile('output', 'create')
-    run = r.FairRunSim()
-    run.SetName('TGeant4')
-    run.SetOutputFile(outFile)
-    run.SetUserConfig('g4Config.C')
-    shipDet_conf.configure(run, ship_geo)
-    run.Init()
-    run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
-    sGeo = r.gGeoManager
-    muonShield = sGeo.GetVolume('MuonShieldArea')
-    L = magnetLength(muonShield)
-    W = magnetMass(muonShield)
-    return L, W
 
 
 def get_bounds():
@@ -327,11 +300,4 @@ if __name__ == '__main__':
         args.input = './fast_muons.root'
         ntotal = 86229
     # TODO read total number from muon file directly
-    dy = 10.
-    vessel_design = 5
-    shield_design = 8
-    mcEngine = 'TGeant4'
-    simEngine = 'MuonBack'
-    sameSeed = 1
-    theSeed = 1
     main()
