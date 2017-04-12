@@ -14,17 +14,7 @@ import ROOT as r
 import shipunit as u
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
-from common import magnetMass, magnetLength, FCN
-
-
-def load_results(fileName):
-    file_ = r.TFile.Open(fileName)
-    xs = r.std.vector('double')()
-    # TODO handle key error explicitly instead of using fact that it's not
-    # fatal implicitly
-    file_.GetObject("results", xs)
-    file_.Close()
-    return xs
+from common import magnetMass, magnetLength, FCN, load_results
 
 
 def retrieve_result(outFile):

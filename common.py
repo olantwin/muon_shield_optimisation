@@ -1,4 +1,5 @@
 import numexpr as ne
+import ROOT as r
 
 
 def FCN(W, x, L):
@@ -41,3 +42,14 @@ def magnetLength(muonShield):
     """
     length = 2 * muonShield.GetShape().GetDZ()
     return length
+
+
+def load_results(fileName):
+    """Loads the polarity corrected x positions [cm] of hits from job
+
+    """
+    f = r.TFile.Open(fileName)
+    xs = r.std.vector('double')()
+    f.GetObject("results", xs)
+    f.Close()
+    return xs

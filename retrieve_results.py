@@ -7,12 +7,11 @@ from multiprocessing import Pool
 from multiprocessing import cpu_count
 from functools import partial
 import argparse
-import numexpr as ne
 import numpy as np
 import ROOT as r
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
-from common import magnetMass, magnetLength, FCN
+from common import magnetMass, magnetLength, FCN, load_results
 
 
 def get_geo(geoFile):
@@ -63,22 +62,10 @@ def check_file(fileName):
         for line in output.split('\n'):
             if 'Size' in line:
                 size = line.split(' ')[-1]
-                # if int(size) != 0:
-                #   print output
                 return int(size) != 0
         print output
     except subprocess.CalledProcessError:
         return False
-
-
-def load_results(fileName):
-    f = r.TFile.Open(fileName)
-    xs = r.TVectorD()
-    # TODO handle key error explicitly instead of using fact that it's not
-    # fatal implicitly
-    xs.Read('results')
-    f.Close()
-    return xs
 
 
 def main():
