@@ -4,7 +4,6 @@ import numpy as np
 import ROOT as r
 import shipunit as u
 import rootUtils as ut
-from rootpy.io import root_open
 from common import get_geo, FCN
 
 
