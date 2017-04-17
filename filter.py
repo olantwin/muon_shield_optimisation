@@ -12,7 +12,6 @@ def main():
     out = r.TFile.Open(args.output, 'recreate')
     outtuple = intuple.CloneTree(0)
     h = Hist2D(100, 0, 350, 100, 0, 6)
-    i = 1
     for muon in intuple:
         px = muon.px
         py = muon.py
@@ -20,13 +19,10 @@ def main():
         p = np.sqrt(px**2 + py**2 + pz**2)
         pt = np.sqrt(px**2 + py**2)
         b = int(p / 350. * 100)+1, int(pt / 6. * 100)+1
-        if h[b].value< 100:
+        if h[b].value < 100:
             h.Fill(p, pt)
             a = array('f', [y for x in muon.values() for y in x])
             outtuple.Fill(a)
-        i += 1
-        if i == 100000:
-            break
     outtuple.Write()
     del outtuple
     intuple = out.Get('pythia8-Geant4')
@@ -40,7 +36,7 @@ def main():
         a = array('f', [y for x in muon.values() for y in x])
         if h[b].value < 10:
             n = int(10/h[b].value)
-            for i in range(n):
+            for _ in range(n):
                 phi = r.gRandom.Uniform(0., 2.) * r.TMath.Pi()
                 px = pt * r.TMath.Cos(phi)
                 py = pt * r.TMath.Sin(phi)
