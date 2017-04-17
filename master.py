@@ -11,7 +11,6 @@ import argparse
 import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
-import shipunit as u
 from common import FCN, load_results, get_geo
 
 
@@ -82,23 +81,23 @@ def worker(id_, geoFile):
 
 
 def get_bounds():
-    dZgap = 0.1 * u.m
+    dZgap = 10.
     zGap = 0.5 * dZgap  # halflengh of gap
-    dZ3 = (0.2 * u.m + zGap, 3 * u.m + zGap)
-    dZ4 = (0.2 * u.m + zGap, 3 * u.m + zGap)
-    dZ5 = (0.2 * u.m + zGap, 3 * u.m + zGap)
-    dZ6 = (0.2 * u.m + zGap, 3 * u.m + zGap)
-    dZ7 = (0.2 * u.m + zGap, 3 * u.m + zGap)
-    dZ8 = (0.2 * u.m + zGap, 3 * u.m + zGap)
+    dZ3 = (20. + zGap, 300. + zGap)
+    dZ4 = (20. + zGap, 300. + zGap)
+    dZ5 = (20. + zGap, 300. + zGap)
+    dZ6 = (20. + zGap, 300. + zGap)
+    dZ7 = (20. + zGap, 300. + zGap)
+    dZ8 = (20. + zGap, 300. + zGap)
     bounds = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
     for _ in range(8):
-        minimum = 0.1 * u.m
-        dXIn = (minimum, 2.5 * u.m)
-        dXOut = (minimum, 2.5 * u.m)
-        dYIn = (minimum, 2.5 * u.m)
-        dYOut = (minimum, 2.5 * u.m)
-        gapIn = (2., 4.98 * u.m)
-        gapOut = (2., 4.98 * u.m)
+        minimum = 10.
+        dXIn = (minimum, 250.)
+        dXOut = (minimum, 250.)
+        dYIn = (minimum, 250.)
+        dYOut = (minimum, 250.)
+        gapIn = (2., 498.)
+        gapOut = (2., 498.)
         bounds += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
     return bounds
 
@@ -149,7 +148,7 @@ def filemaker(id_):
 
 
 def compute_FCN(params):
-    params = [0.7 * u.m, 1.7 * u.m] + params  # Add constant parameters
+    params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
     geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
@@ -203,68 +202,68 @@ def main():
     bounds = get_bounds()
     start = [
         # Lengths:
-        2.0 * u.m + 5 * u.cm,
-        2.0 * u.m + 5 * u.cm,
-        2.75 * u.m + 5 * u.cm,
-        2.4 * u.m + 5 * u.cm,
-        3.0 * u.m + 5 * u.cm,
-        2.35 * u.m + 5 * u.cm,
+        200. + 5.,
+        200. + 5.,
+        275. + 5.,
+        240. + 5.,
+        300. + 5.,
+        235. + 5.,
         # MagnAbsorb1:
-        0.4 * u.m,
-        0.4 * u.m,
-        1.5 * u.m,
-        1.5 * u.m,
-        0.02 * u.m,
-        0.02 * u.m,
+        40.,
+        40.,
+        150.,
+        150.,
+        2.,
+        2.,
         # MagnAbsorb2:
-        0.8 * u.m,
-        0.8 * u.m,
-        1.5 * u.m,
-        1.5 * u.m,
-        0.02 * u.m,
-        0.02 * u.m,
+        80.,
+        80.,
+        150.,
+        150.,
+        2.,
+        2.,
         # Magn1:
-        0.87 * u.m,
-        0.65 * u.m,
-        0.35 * u.m,
-        1.21 * u.m,
-        0.11 * u.m,
-        0.02 * u.m,
+        87.,
+        65.,
+        35.,
+        121,
+        11.,
+        2.,
         # Magn2:
-        0.65 * u.m,
-        0.43 * u.m,
-        1.21 * u.m,
-        2.07 * u.m,
-        0.11 * u.m,
-        0.02 * u.m,
+        65.,
+        43.,
+        121.,
+        207.,
+        11.,
+        2.,
         # Magn3:
-        0.06 * u.m,
-        0.33 * u.m,
-        0.32 * u.m,
-        0.13 * u.m,
-        0.7 * u.m,
-        0.11 * u.m,
+        6.,
+        33.,
+        32.,
+        13.,
+        70.,
+        11.,
         # Magn4:
-        0.05 * u.m,
-        0.16 * u.m,
-        1.12 * u.m,
-        0.05 * u.m,
-        0.04 * u.m,
-        0.02 * u.m,
+        5.,
+        16.,
+        112.,
+        5.,
+        4.,
+        2.,
         # Magn5:
-        0.15 * u.m,
-        0.34 * u.m,
-        2.35 * u.m,
-        0.32 * u.m,
-        0.05 * u.m,
-        0.08 * u.m,
+        15.,
+        34.,
+        235.,
+        32.,
+        5.,
+        8.,
         # Magn6:
-        0.31 * u.m,
-        0.9 * u.m,
-        1.86 * u.m,
-        3.1 * u.m,
-        0.02 * u.m,
-        0.55 * u.m,
+        31.,
+        90.,
+        186.,
+        310.,
+        2.,
+        55.,
     ]
     res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
