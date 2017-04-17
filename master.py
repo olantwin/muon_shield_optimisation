@@ -59,7 +59,7 @@ def check_path(path):
             return False
 
 
-def worker(id_, geoFile):
+def worker(id_, geoFile, lofi=False):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
     n = (ntotal / args.njobs) + (ntotal % args.njobs
@@ -70,11 +70,14 @@ def worker(id_, geoFile):
         path = os.path.dirname(outFile)
         if not os.path.isdir(path):
             os.makedirs(path)
+        command = [
+            './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
+            worker_filename, '-n', str(n), '--results', outFile
+        ]
+        if lofi:
+            command += ['--lofi']
         subprocess.call(
-            [
-                './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
-                worker_filename, '-n', str(n), '--results', outFile#, '--lofi'
-            ],
+            command,
             shell=False)
     print 'Master: Worker process {} done.'.format(id_)
     return retrieve_result(outFile)
@@ -147,7 +150,7 @@ def filemaker(id_):
         worker_file.Close()
 
 
-def compute_FCN(params):
+def compute_FCN(params, lofi=False):
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
@@ -159,7 +162,7 @@ def compute_FCN(params):
     if not args.local:
         expected_time = 2400  # seconds
         time.sleep(expected_time / 4)
-    partial_worker = partial(worker, geoFile=geoFile)
+    partial_worker = partial(worker, geoFile=geoFile, lofi=lofi)
     ids = range(1, args.njobs + 1)
     results = pool.map(partial_worker, ids)
     L, W = geo_result.get()
