@@ -14,18 +14,18 @@ import ROOT as r
 from common import FCN, load_results, get_geo
 
 
-def retrieve_result(outFile):
+def retrieve_result(outFile, local):
     print 'Retrieving results from {}.'.format(outFile)
-    if not args.local:
+    if not local:
         while True:
-            if check_file(outFile):
+            if check_file(outFile, local):
                 break
             time.sleep(60)  # Wait for job to finish
     return load_results(outFile)
 
 
-def check_file(fileName, strict=True):
-    if args.local:
+def check_file(fileName, local, strict=True):
+    if local:
         return os.path.isfile(fileName)
     else:
         parser_ = urlparse(fileName)
@@ -45,8 +45,8 @@ def check_file(fileName, strict=True):
             return False
 
 
-def check_path(path):
-    if args.local:
+def check_path(path, local):
+    if local:
         return os.path.isdir(path)
     else:
         parser_ = urlparse(path)
@@ -59,14 +59,14 @@ def check_path(path):
             return False
 
 
-def worker(id_, geoFile, lofi=False):
+def worker(id_, geoFile, lofi, backend):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
     n = (ntotal / args.njobs) + (ntotal % args.njobs
                                  if id_ == args.njobs else 0)
     outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
         args.workDir, os.path.basename(geoFile), id_)
-    if args.local:
+    if backend == 'local':
         path = os.path.dirname(outFile)
         if not os.path.isdir(path):
             os.makedirs(path)
@@ -80,7 +80,7 @@ def worker(id_, geoFile, lofi=False):
             command,
             shell=False)
     print 'Master: Worker process {} done.'.format(id_)
-    return retrieve_result(outFile)
+    return retrieve_result(outFile, backend == 'local')
 
 
 def get_bounds():
@@ -114,10 +114,10 @@ def generate_geo(geofile, params):
     return geofile
 
 
-def check_worker_file(id_):
+def check_worker_file(id_, local):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
-    if check_file(worker_filename, strict=False):
+    if check_file(worker_filename, local, strict=False):
         print worker_filename, 'exists.'
     else:
         return id_
@@ -132,12 +132,12 @@ def init_filemaker():
     tree = f.Get('pythia8-Geant4')
 
 
-def filemaker(id_):
+def filemaker(id_, local):
     # requires init_worker_files to initialise worker process
     assert id_
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
-    if check_file(worker_filename):
+    if check_file(worker_filename, local):
         print worker_filename, 'exists.'
     else:
         print 'Creating workerfile: ', worker_filename
@@ -150,16 +150,17 @@ def filemaker(id_):
         worker_file.Close()
 
 
-def compute_FCN(params, lofi=False):
+def compute_FCN(params, lofi=False, backend='skygrid'):
+    local = backend == 'local'
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
     geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
-        '.', compute_FCN.counter), params) if not args.local else geoFile
+        '.', compute_FCN.counter), params) if not local else geoFile
     pool = Pool(processes=min(args.njobs,
-                              cpu_count() - 1 if args.local else 2 * cpu_count() - 2))
+                              cpu_count() - 1 if local else 2 * cpu_count() - 2))
     geo_result = pool.apply_async(get_geo, [geoFileLocal])
-    if not args.local:
+    if not local:
         expected_time = 2400  # seconds
         time.sleep(expected_time / 4)
     partial_worker = partial(worker, geoFile=geoFile, lofi=lofi)
@@ -190,20 +191,27 @@ compute_FCN.counter = 107
 def main():
     pool = Pool(
         processes=min(args.njobs, cpu_count()))
-    assert check_path('{}/worker_files'.format(args.workDir))
+    assert check_path('{}/worker_files'.format(args.workDir), args.local)
     ids = range(1, args.njobs + 1)
-    missing_files = pool.imap_unordered(check_worker_file, ids)
+    missing_files = pool.imap_unordered(
+        partial(check_worker_file, local=args.local),
+        ids
+    )
     pool.close()
     pool.join()
     pool = Pool(
         processes=min(args.njobs, cpu_count()), initializer=init_filemaker)
     missing_ids = ifilter(None, missing_files)
-    pool.imap_unordered(filemaker, missing_ids)
+    pool.imap_unordered(
+        partial(filemaker, local=args.local),
+        missing_ids
+    )
     pool.close()
     pool.join()
     del pool
     bounds = get_bounds()
     start = [
+        # Units all in cm
         # Lengths:
         200. + 5.,
         200. + 5.,
