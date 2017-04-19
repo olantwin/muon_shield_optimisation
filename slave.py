@@ -107,17 +107,16 @@ def main():
                         x *= pid / 13.
                         if (P > 1 and abs(y) < 5 * u.m and
                                 (x < 2.6 * u.m and x > -3 * u.m)):
-                            xs.push_back(x)
                             w = np.sqrt(500.-(x+300.)/560.)
+                            xs.push_back(w)
                             h['mu_p'].Fill(P)
                             if pid == 13:
                                 h['mu_w_pos'].Fill(x, y, w)
                             else:
                                 h['anti-mu_w_pos'].Fill(-x, y, w)
-    ut.writeHists(h, args.results)
-    res = r.TFile.Open(args.results, 'update')
-    res.WriteObject(xs, "results")
-    res.Close()
+    ut.writeHists(h, "test.root")
+    with open(args.results, 'w') as f:
+        f.write("{}\n".format(sum(xs)))
     print 'Slave: Worker process {} done.'.format(id_)
 
 
@@ -133,7 +132,7 @@ if __name__ == '__main__':
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument(
         '--results',
-        default='test.root')
+        default='test.csv')
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--jobid', type=int, required=True)
     parser.add_argument('-n', '--nEvents', type=int, default=None)
