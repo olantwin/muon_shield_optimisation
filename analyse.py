@@ -42,7 +42,7 @@ def main():
                     if (P > 1 and abs(y) < 5 * u.m and
                             (x < 2.6 * u.m and x > -3 * u.m)):
                         xs.push_back(x)
-                        w = np.sqrt(500.-(x+300.)/560.)
+                        w = np.sqrt((560.-(x+300.))/560.)
                         h['mu_p'].Fill(P)
                         if pid == 13:
                             h['mu_w_pos'].Fill(x, y, w)
