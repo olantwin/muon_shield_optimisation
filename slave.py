@@ -72,7 +72,6 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
 
 def main():
     h = {}
-    id_ = args.jobid
     n = args.nEvents if args.nEvents else 100000
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
@@ -117,7 +116,6 @@ def main():
     ut.writeHists(h, "test.root")
     with open(args.results, 'w') as f:
         f.write("{}\n".format(sum(xs)))
-    print 'Slave: Worker process {} done.'.format(id_)
 
 
 if __name__ == '__main__':
@@ -134,7 +132,6 @@ if __name__ == '__main__':
         '--results',
         default='test.csv')
     parser.add_argument('--geofile', required=True)
-    parser.add_argument('--jobid', type=int, required=True)
     parser.add_argument('-n', '--nEvents', type=int, default=None)
     parser.add_argument('--lofi', action='store_true')
     args = parser.parse_args()
