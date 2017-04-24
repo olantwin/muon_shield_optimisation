@@ -5,7 +5,7 @@ from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
 
 
-def FCN(W, x, L):
+def FCN(W, Sxi2, L):
     """Calculate penalty function.
 
     W = weight [kg]
@@ -13,8 +13,7 @@ def FCN(W, x, L):
     L = shield length [cm]
 
     """
-    Sxi2 = ne.evaluate('sum(sqrt(560-(x+300.)/560))') if x.size else 0.
-    print W, x, L, Sxi2
+    print W, L, Sxi2
     return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
 
 

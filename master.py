@@ -12,6 +12,7 @@ import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
 from common import FCN, load_results, get_geo
+from skysteer import calculate_geofile
 
 
 def retrieve_result(outFile, local):
@@ -59,7 +60,7 @@ def check_path(path, local):
             return False
 
 
-def worker(id_, geoFile, lofi, backend):
+def worker(id_, geoFile, lofi, backend='local'):
     worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
         args.workDir, id_, args.njobs)
     n = (ntotal / args.njobs) + (ntotal % args.njobs
@@ -155,29 +156,19 @@ def compute_FCN(params, lofi=False, backend='skygrid'):
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
-    geoFileLocal = generate_geo('{}/input_files/geo_{}.root'.format(
-        '.', compute_FCN.counter), params) if not local else geoFile
     pool = Pool(processes=min(args.njobs,
-                              cpu_count() - 1 if local else 2 * cpu_count() - 2))
-    geo_result = pool.apply_async(get_geo, [geoFileLocal])
-    if not local:
-        expected_time = 2400  # seconds
-        time.sleep(expected_time / 4)
-    partial_worker = partial(worker, geoFile=geoFile, lofi=lofi)
-    ids = range(1, args.njobs + 1)
-    results = pool.map(partial_worker, ids)
+                              cpu_count() - 1 if local else 1))
+    geo_result = pool.apply_async(get_geo, [geoFile])
+    chi2s = pool.map(
+        partial(worker, geoFile=geoFile, lofi=lofi),
+        range(1, args.njobs + 1)
+    ) if local else calculate_geofile(geoFile)
     L, W = geo_result.get()
     print 'Processing results...'
-    xs = [x for xs in results for x in xs]
-    fcn = FCN(W, np.array(xs), L)
+    fcn = FCN(W, chi2s, L)
     assert np.isclose(
         L / 2.,
         sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
-    print fcn
-    with open('geo/fcns.csv', 'a') as f:
-        f.write('{},{},{},{},{},{} \n'.format(
-            compute_FCN.counter, fcn, L, W, sum(xs), len(xs)
-        ))
     pool.close()
     pool.join()
     del pool
