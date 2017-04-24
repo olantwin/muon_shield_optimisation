@@ -1,3 +1,4 @@
+"""Functions shared between master, slave and the utility scripts."""
 import os
 import numexpr as ne
 import ROOT as r
@@ -8,10 +9,19 @@ import shipDet_conf
 def FCN(W, x, L):
     """Calculate penalty function.
 
-    W = weight [kg]
-    x = array of positions of muon hits in bending plane [cm]
-    L = shield length [cm]
+    Parameters
+    ----------
+    W : float
+        weight [kg]
+    x : float
+        array of positions of muon hits in bending plane [cm]
+    L : float
+        shield length [cm]
 
+    Returns
+    -------
+    float
+        Loss function value
     """
     Sxi2 = ne.evaluate('sum(sqrt((560-(x+300.))/560))') if x.size else 0.
     print W, x, L, Sxi2
@@ -19,11 +29,18 @@ def FCN(W, x, L):
 
 
 def magnetMass(muonShield):
-    """Calculate magnet weight [kg]
+    """Calculate magnet weight analytically [kg].
 
-    Assumes magnets contained in `MuonShieldArea` TGeoVolumeAssembly and
-    contain `Magn` in their name. Calculation is done analytically by
-    the TGeoVolume class.
+    Parameters
+    ----------
+    muonShield : TGeoVolumeAssembly
+        Assembly that contains the muon shield magnets. Assumes it is named
+        `MuonShieldArea` and that the magnet names contain `Magn`.
+
+    Returns
+    -------
+    float
+        Magnet mass in [kg].
 
     """
     nodes = muonShield.GetNodes()
@@ -36,11 +53,21 @@ def magnetMass(muonShield):
 
 
 def magnetLength(muonShield):
-    """Ask TGeoShapeAssembly for magnet length [cm]
+    """Ask TGeoShapeAssembly for magnet length [cm].
 
     Note: Ignores one of the gaps before or after the magnet
 
     Also note: TGeoShapeAssembly::GetDZ() returns a half-length
+
+    Parameters
+    ----------
+    muonShield : TGeoVolumeAssembly
+        Assembly that contains the muon shield magnets.
+
+    Returns
+    -------
+    float
+        Magnet length in [cm].
 
     """
     length = 2 * muonShield.GetShape().GetDZ()
@@ -48,8 +75,18 @@ def magnetLength(muonShield):
 
 
 def load_results(fileName):
-    """Loads the polarity corrected x positions [cm] of hits from job
+    """Load the polarity corrected x positions [cm] of hits from job.
 
+    Parameters
+    ----------
+    fileName : str
+        File in which results were saved. Assumes they were saved with the key
+        "results".
+
+    Returns
+    -------
+    std::vector<double>
+        Vector of hit x-positions [cm]
     """
     f = r.TFile.Open(fileName)
     xs = r.std.vector('double')()
@@ -59,6 +96,24 @@ def load_results(fileName):
 
 
 def get_geo(geoFile):
+    """Generate the geometry and check its lenght and weight.
+
+    Note: As FairRunSim is a C++ singleton it misbehaves if run
+    more than once in a process.
+
+    Parameters
+    ----------
+    geoFile : str
+        File with the muon shield parameters (not with the geometry config!)
+
+    Returns
+    -------
+    L : float
+        Magnet length in [cm].
+    W : float
+        Magnet mass in [kg].
+
+    """
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=10,

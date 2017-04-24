@@ -8,7 +8,7 @@ from common import get_geo, FCN
 
 
 def analyse(tree, outputfile):
-    """Analyse tree to calculate chi^2 and create histograms.
+    """Analyse tree to find hit positions and create histograms.
 
     Parameters
     ----------
@@ -21,7 +21,7 @@ def analyse(tree, outputfile):
     Returns
     -------
     std::vector<double>
-        Vector of chi^2 of hits
+        Vector of hit x-positions [cm]
 
     """
     h = {}
