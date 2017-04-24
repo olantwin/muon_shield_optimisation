@@ -14,6 +14,10 @@ def main():
     ut.bookHist(h, 'mu_w_pos', '#mu- hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
     ut.bookHist(h, 'anti-mu_w_pos', '#mu+ hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
     ut.bookHist(h, 'mu_p', '#mu+-;p[GeV];', 100, 0, 350)
+    ut.bookHist(h, 'mu_p_original', '#mu+-;p[GeV];', 100, 0, 350)
+    ut.bookHist(h, 'mu_pt_original', '#mu+-;p_t[GeV];', 100, 0, 6)
+    ut.bookHist(h, 'mu_ppt_original', '#mu+-;p[GeV];p_t[GeV];', 100, 0, 350, 100, 0, 6)
+    ut.bookHist(h, 'smear', '#mu+- initial vertex;x[cm];y[cm]', 100, -100, +100, 100, -100, 100)
     xs = r.std.vector('double')()
     f = r.TFile.Open(args.input, 'read')
     tree = f.cbmsim
@@ -24,6 +28,8 @@ def main():
         i += 1
         if i % 1000 == 0:
             print '{}/{}\r'.format(i, n),
+        original_muon = event.MCTrack[1]
+        h['smear'].Fill(original_muon.GetStartX(), original_muon.GetStartY())
         for hit in event.vetoPoint:
             if hit:
                 if not hit.GetEnergyLoss() > 0:
@@ -44,6 +50,13 @@ def main():
                         xs.push_back(x)
                         w = np.sqrt((560.-(x+300.))/560.)
                         h['mu_p'].Fill(P)
+                        original_muon = event.MCTrack[1]
+                        h['mu_p_original'].Fill(original_muon.GetP())
+                        h['mu_pt_original'].Fill(original_muon.GetPt())
+                        h['mu_ppt_original'].Fill(
+                            original_muon.GetP(),
+                            original_muon.GetPt()
+                        )
                         if pid == 13:
                             h['mu_w_pos'].Fill(x, y, w)
                         else:
