@@ -1,16 +1,32 @@
 #!/usr/bin/env python2
 import argparse
 import tempfile
-import numpy as np
 import ROOT as r
 import shipunit as u
 import geomGeant4
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
-import rootUtils as ut
+from analyse import analyse
 
 
 def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
+    """Generate muon background and transport it through the geometry.
+
+    Parameters
+    ----------
+    inputFile : str
+        File with muon ntuple
+    geoFile : str
+        File with the muon shield parameters (not with the geometry config!)
+    nEvents : int
+        Number of events to read from inputFile
+    outFile : str
+        File in which `cbmsim` tree is saved
+    lofi : bool, optional
+        Determine fidelity. If True all non-essential Geant4
+        processes will be deactivated
+
+    """
     firstEvent = 0
     dy = 10.
     vessel_design = 5
@@ -71,53 +87,20 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
 
 
 def main():
-    h = {}
     id_ = args.jobid
     n = args.nEvents if args.nEvents else 100000
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
 
-    ut.bookHist(h, 'mu_pos', '#mu- hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
-    ut.bookHist(h, 'anti-mu_pos', '#mu+ hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
-    ut.bookHist(h, 'mu_w_pos', '#mu- hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
-    ut.bookHist(h, 'anti-mu_w_pos', '#mu+ hits;x[cm];y[cm]', 100, -1000, +1000, 100, -800, 1000)
-    ut.bookHist(h, 'mu_p', '#mu+-;p[GeV];', 100, 0, 350)
-    xs = r.std.vector('double')()
     with tempfile.NamedTemporaryFile() as t:
         outFile = t.name
         generate(args.input, args.geofile, n, outFile, args.lofi)
-        ch = r.TChain('cbmsim')
-        ch.Add(outFile)
-        mom = r.TVector3()
-        for event in ch:
-            for hit in event.vetoPoint:
-                if hit:
-                    if (not hit.GetEnergyLoss() > 0) and (not args.lofi):
-                        continue
-                    pid = hit.PdgCode()
-                    if hit.GetZ() > 2597 and hit.GetZ() < 2599 and abs(pid) == 13:
-                        hit.Momentum(mom)
-                        P = mom.Mag() / u.GeV
-                        y = hit.GetY()
-                        x = hit.GetX()
-                        if pid == 13:
-                            h['mu_pos'].Fill(x, y)
-                        else:
-                            h['anti-mu_pos'].Fill(x, y)
-                        x *= pid / 13.
-                        if (P > 1 and abs(y) < 5 * u.m and
-                                (x < 2.6 * u.m and x > -3 * u.m)):
-                            xs.push_back(x)
-                            w = np.sqrt((560.-(x+300.))/560.)
-                            h['mu_p'].Fill(P)
-                            if pid == 13:
-                                h['mu_w_pos'].Fill(x, y, w)
-                            else:
-                                h['anti-mu_w_pos'].Fill(-x, y, w)
-    ut.writeHists(h, args.results)
-    res = r.TFile.Open(args.results, 'update')
-    res.WriteObject(xs, "results")
-    res.Close()
+        chain = r.TChain('cbmsim')
+        chain.Add(outFile)
+        xs = analyse(chain, args.results)
+        res = r.TFile.Open(args.results, 'update')
+        res.WriteObject(xs, 'results')
+        res.Close()
     print 'Slave: Worker process {} done.'.format(id_)
 
 
@@ -131,9 +114,7 @@ if __name__ == '__main__':
         default='root://eoslhcb.cern.ch/'
         '/eos/ship/data/Mbias/'
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
-    parser.add_argument(
-        '--results',
-        default='test.root')
+    parser.add_argument('--results', default='test.root')
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--jobid', type=int, required=True)
     parser.add_argument('-n', '--nEvents', type=int, default=None)
