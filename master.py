@@ -1,10 +1,10 @@
 #!/usr/bin/env python2
-from multiprocessing import Pool
 import argparse
 import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
-from common import FCN, get_geo
+from sh import docker
+from common import FCN
 from skysteer import calculate_geofile
 
 
@@ -43,18 +43,13 @@ def compute_FCN(params):
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
-    pool = Pool(processes=1)
-    geo_result = pool.apply_async(get_geo, [geoFile])
-    chi2s = calculate_geofile(geoFile)
-    L, W = geo_result.get()
+    # TODO Docker goes here
+    chi2s, L, W = calculate_geofile(geoFile)
     print 'Processing results...'
     fcn = FCN(W, chi2s, L)
     assert np.isclose(
         L / 2.,
         sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
-    pool.close()
-    pool.join()
-    del pool
     compute_FCN.counter += 1
     return fcn
 
