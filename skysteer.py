@@ -5,16 +5,15 @@ from libscheduler import Metascheduler
 from time import sleep, time
 import copy
 import traceback
+from sh import pscp
 
 
 METASCHEDULER_URL = "http://metascheduler.cern.tst.yandex.net/"
 ms = Metascheduler(METASCHEDULER_URL)
-
-GEO_DIR = "/home/sashab1/ship-shield/geofiles"
 queue = ms.queue("docker_queue")
 
 
-JOB_TEMPLATE = {a
+JOB_TEMPLATE = {
     "descriptor": {
         "input": [
             # "local:/home/sashab1/ship-shield/code/worker.sh",
@@ -83,8 +82,8 @@ def wait_jobs(jobs):
                 job.update_status("pending")
 
         print "  [{}/{}]".format(completed, len(jobs))
-        if completed > 1590:
-            print time(), ">1590 jobs completed!"
+        if completed == 1600:
+            print time(), "All jobs completed!"
             break
 
 def get_result(jobs):
@@ -102,8 +101,13 @@ def get_result(jobs):
     return sum_result
 
 
+def distribute_geofile(geofile):
+    pscp("-r", "-h", "/home/sashab1/shield-control/hosts.txt", geofile, "/home/sashab1/ship-shield/geofiles/")
+
+
 def calculate_geofile(geofile):
-    jobs = push_jobs_for_geofile(geofile)
+    distribute_geofile(geofile)
+    jobs = push_jobs_for_geofile(geofile.split("/")[-1])
     wait_jobs(jobs)
     return get_result(jobs)
 
