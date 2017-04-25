@@ -2,11 +2,17 @@
 import os
 import argparse
 import numpy as np
+import numexpr as ne
 from skopt import forest_minimize, dump
 import ROOT as r
 from sh import docker
-from common import FCN
 from skysteer import calculate_geofile
+
+
+def FCN(W, Sxi2, L):
+    print W, L, Sxi2
+    return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
+
 
 def get_bounds():
     dZgap = 10.
@@ -49,15 +55,19 @@ def compute_FCN(params):
             "--rm",
             "-v", "{}:/shield".format(args.workDir),
             "olantwin/ship-shield:20170420",
-            '/bin/bash', '-l', '-c', "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{}.root".format(compute_FCN.counter)
+            '/bin/bash',
+            '-l',
+            '-c',
+            "source /opt/FairShipRun/config.sh;"
+            " python2 /shield/code/get_geo.py"
+            "-g /shield/input_files/geo_{}.root".format(compute_FCN.counter)
         )
     except Exception, e:
         print "Docker finished with error:", e.stderr
-        pass
 
     chi2s = calculate_geofile(geoFile)
     with open(os.path.join(args.workDir, 'input_files/lw.csv')) as lw_f:
-        L, W  = map(float, lw_f.read().strip().split(","))
+        L, W = map(float, lw_f.read().strip().split(","))
 
     print 'Processing results...'
     fcn = FCN(W, chi2s, L)
@@ -68,8 +78,8 @@ def compute_FCN(params):
     return fcn
 
 
-
 compute_FCN.counter = 36
+
 
 def main():
     bounds = get_bounds()
