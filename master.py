@@ -1,10 +1,10 @@
 #!/usr/bin/env python2
-from multiprocessing import Pool
 import argparse
 import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
-from common import FCN, get_geo
+from sh import docker
+from common import FCN
 from skysteer import calculate_geofile
 from sh import docker
 
@@ -43,30 +43,26 @@ def compute_FCN(params):
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
+
     docker.run(
         "--rm",
         "-v", "{}:/shield".format(args.workDir),
         "olantwin/ship-shield:20170420",
         '/bin/bash', '-l', '-c', "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{}.root".format(compute_FCN.counter)
     )
-    pool = Pool(processes=1)
-    geo_result = pool.apply_async(get_geo, [geoFile])
-    chi2s = calculate_geofile(geoFile)
-    L, W = geo_result.get()
+    chi2s, L, W = calculate_geofile(geoFile)
+
     print 'Processing results...'
     fcn = FCN(W, chi2s, L)
     assert np.isclose(
         L / 2.,
         sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
-    pool.close()
-    pool.join()
-    del pool
     compute_FCN.counter += 1
     return fcn
 
 
-compute_FCN.counter = 36
 
+compute_FCN.counter = 36
 
 def main():
     bounds = get_bounds()
@@ -139,7 +135,7 @@ def main():
     if args.only_geo:
         params = [70., 170.] + start  # Add constant parameters
         geoFile = generate_geo('geo_start.root', params)
-        print "geofile written to {}".format(geoFile)
+        print 'geofile written to {}'.format(geoFile)
         return 0
     res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
@@ -160,11 +156,7 @@ if __name__ == '__main__':
         '--workDir',
         default='root://eoslhcb.cern.ch/'
         '/eos/ship/user/olantwin/skygrid')
-    parser.add_argument(
-        '-j',
-        '--njobs',
-        type=int,
-        required=True)
+    parser.add_argument('-j', '--njobs', type=int, required=True)
     parser.add_argument('--only_geo', action='store_true')
     args = parser.parse_args()
     ntotal = 17786274
