@@ -1,87 +1,11 @@
 #!/usr/bin/env python2
-import os
-import time
-from urlparse import urlparse
-import subprocess
 from multiprocessing import Pool
-from multiprocessing import cpu_count
-from functools import partial
-from itertools import ifilter
 import argparse
 import numpy as np
 from skopt import forest_minimize, dump
 import ROOT as r
-from common import FCN, load_results, get_geo
+from common import FCN, get_geo
 from skysteer import calculate_geofile
-
-
-def retrieve_result(outFile, local):
-    print 'Retrieving results from {}.'.format(outFile)
-    if not local:
-        while True:
-            if check_file(outFile, local):
-                break
-            time.sleep(60)  # Wait for job to finish
-    return load_results(outFile)
-
-
-def check_file(fileName, local, strict=True):
-    if local:
-        return os.path.isfile(fileName)
-    else:
-        parser_ = urlparse(fileName)
-        try:
-            command = ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]]
-            if strict:
-                command += ['-q', 'IsReadable']
-            output = subprocess.check_output(command)
-            for line in output.split('\n'):
-                if 'Size' in line:
-                    size = line.split(' ')[-1]
-                    if int(size) != 0:
-                        print output
-                    return int(size) != 0
-            print output
-        except subprocess.CalledProcessError:
-            return False
-
-
-def check_path(path, local):
-    if local:
-        return os.path.isdir(path)
-    else:
-        parser_ = urlparse(path)
-        try:
-            subprocess.check_output(
-                ['xrdfs', parser_.netloc, 'stat', parser_.path[1:]])
-            return True
-        except subprocess.CalledProcessError as e:
-            print e.returncode, e.output
-            return False
-
-
-def worker(id_, geoFile, lofi, backend='local'):
-    worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
-        args.workDir, id_, args.njobs)
-    n = (ntotal / args.njobs) + (ntotal % args.njobs
-                                 if id_ == args.njobs else 0)
-    outFile = '{}/output_files/iteration_{}/{}/result.root'.format(
-        args.workDir, os.path.basename(geoFile), id_)
-    if backend == 'local':
-        path = os.path.dirname(outFile)
-        if not os.path.isdir(path):
-            os.makedirs(path)
-        command = [
-            './slave.py', '--geofile', geoFile, '--jobid', str(id_), '-f',
-            worker_filename, '-n', str(n), '--results', outFile
-        ]
-        if lofi:
-            command += ['--lofi']
-        subprocess.call(
-            command,
-            shell=False)
-    print 'Master: Worker process {} done.'.format(id_)
-    return retrieve_result(outFile, backend == 'local')
 
 
 def get_bounds():
@@ -115,54 +39,13 @@ def generate_geo(geofile, params):
     return geofile
 
 
-def check_worker_file(id_, local):
-    worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
-        args.workDir, id_, args.njobs)
-    if check_file(worker_filename, local, strict=False):
-        print worker_filename, 'exists.'
-    else:
-        return id_
-
-
-f, tree = None, None
-
-
-def init_filemaker():
-    global f, tree
-    f = r.TFile.Open(args.input)
-    tree = f.Get('pythia8-Geant4')
-
-
-def filemaker(id_, local):
-    # requires init_worker_files to initialise worker process
-    assert id_
-    worker_filename = ('{}/worker_files/muons_{}_{}.root').format(
-        args.workDir, id_, args.njobs)
-    if check_file(worker_filename, local):
-        print worker_filename, 'exists.'
-    else:
-        print 'Creating workerfile: ', worker_filename
-        worker_file = r.TFile.Open(worker_filename, 'recreate')
-        n = (ntotal / args.njobs)
-        firstEvent = n * (id_ - 1)
-        n += (ntotal % args.njobs if id_ == args.njobs else 0)
-        worker_data = tree.CopyTree('', '', n, firstEvent)
-        worker_data.Write()
-        worker_file.Close()
-
-
-def compute_FCN(params, lofi=False, backend='skygrid'):
-    local = backend == 'local'
+def compute_FCN(params):
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
-    pool = Pool(processes=min(args.njobs,
-                              cpu_count() - 1 if local else 1))
+    pool = Pool(processes=1)
     geo_result = pool.apply_async(get_geo, [geoFile])
-    chi2s = pool.map(
-        partial(worker, geoFile=geoFile, lofi=lofi),
-        range(1, args.njobs + 1)
-    ) if local else calculate_geofile(geoFile)
+    chi2s = calculate_geofile(geoFile)
     L, W = geo_result.get()
     print 'Processing results...'
     fcn = FCN(W, chi2s, L)
@@ -260,7 +143,6 @@ def main():
 
 if __name__ == '__main__':
     r.gErrorIgnoreLevel = r.kWarning
-    r.gSystem.Load('libpythia8')
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-f',
@@ -276,15 +158,8 @@ if __name__ == '__main__':
         '-j',
         '--njobs',
         type=int,
-        default=min(8, cpu_count()), )
-    parser.add_argument('--local', action='store_true')
+        required=True)
     parser.add_argument('--only_geo', action='store_true')
     args = parser.parse_args()
-    assert args.local ^ ('root://' in args.workDir), (
-        'Please specify a local workDir if not working on EOS.\n')
     ntotal = 17786274
-    if args.local:
-        args.input = './fast_muons.root'
-        ntotal = 86229
-    # TODO read total number from muon file directly
-    return main()
+    main()
