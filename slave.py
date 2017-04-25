@@ -113,7 +113,7 @@ def main():
                                 h['mu_w_pos'].Fill(x, y, w)
                             else:
                                 h['anti-mu_w_pos'].Fill(-x, y, w)
-    ut.writeHists(h, "test.root")
+    ut.writeHists(h, "/output/hists.root")
     with open(args.results, 'w') as f:
         f.write("{}\n".format(sum(xs)))
 
