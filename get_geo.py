@@ -52,7 +52,7 @@ def get_geo(geoFile):
     run.SetUserConfig('g4Config.C')
     shipDet_conf.configure(run, ship_geo)
     run.Init()
-    run.CreateGeometryFile('./geo/' + os.path.basename(geoFile))
+    run.CreateGeometryFile('/shield/geo/' + os.path.basename(geoFile))
     sGeo = r.gGeoManager
     muonShield = sGeo.GetVolume('MuonShieldArea')
     L = magnetLength(muonShield)
