@@ -180,26 +180,6 @@ compute_FCN.counter = 107
 
 
 def main():
-    pool = Pool(
-        processes=min(args.njobs, cpu_count()))
-    assert check_path('{}/worker_files'.format(args.workDir), args.local)
-    ids = range(1, args.njobs + 1)
-    missing_files = pool.imap_unordered(
-        partial(check_worker_file, local=args.local),
-        ids
-    )
-    pool.close()
-    pool.join()
-    pool = Pool(
-        processes=min(args.njobs, cpu_count()), initializer=init_filemaker)
-    missing_ids = ifilter(None, missing_files)
-    pool.imap_unordered(
-        partial(filemaker, local=args.local),
-        missing_ids
-    )
-    pool.close()
-    pool.join()
-    del pool
     bounds = get_bounds()
     start = [
         # Units all in cm
@@ -267,6 +247,11 @@ def main():
         2.,
         55.,
     ]
+    if args.only_geo:
+        params = [70., 170.] + start  # Add constant parameters
+        geoFile = generate_geo('geo_start.root', params)
+        print "geofile written to {}".format(geoFile)
+        return 0
     res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
     compute_FCN(res.x)
@@ -293,6 +278,7 @@ if __name__ == '__main__':
         type=int,
         default=min(8, cpu_count()), )
     parser.add_argument('--local', action='store_true')
+    parser.add_argument('--only_geo', action='store_true')
     args = parser.parse_args()
     assert args.local ^ ('root://' in args.workDir), (
         'Please specify a local workDir if not working on EOS.\n')
@@ -301,4 +287,4 @@ if __name__ == '__main__':
         args.input = './fast_muons.root'
         ntotal = 86229
     # TODO read total number from muon file directly
-    main()
+    return main()
