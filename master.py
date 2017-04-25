@@ -43,7 +43,12 @@ def compute_FCN(params):
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
-    # TODO Docker goes here
+    docker.run(
+        '--rm', '-v', '/home/sashab1/shield-control/files:/shield',
+        'olantwin/ship-shield:20170420', '/bin/bash', '-l', '-c',
+        'source /opt/FairShipRun/config.sh;'
+        ' python2 /shield/code/get_geo.py -g /shield/input_files/geo_{}.root'.
+        format(compute_FCN.counter))
     chi2s, L, W = calculate_geofile(geoFile)
     print 'Processing results...'
     fcn = FCN(W, chi2s, L)
@@ -54,7 +59,7 @@ def compute_FCN(params):
     return fcn
 
 
-compute_FCN.counter = 107
+compute_FCN.counter = 1
 
 
 def main():
@@ -128,7 +133,7 @@ def main():
     if args.only_geo:
         params = [70., 170.] + start  # Add constant parameters
         geoFile = generate_geo('geo_start.root', params)
-        print "geofile written to {}".format(geoFile)
+        print 'geofile written to {}'.format(geoFile)
         return 0
     res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
     print res
@@ -149,11 +154,7 @@ if __name__ == '__main__':
         '--workDir',
         default='root://eoslhcb.cern.ch/'
         '/eos/ship/user/olantwin/skygrid')
-    parser.add_argument(
-        '-j',
-        '--njobs',
-        type=int,
-        required=True)
+    parser.add_argument('-j', '--njobs', type=int, required=True)
     parser.add_argument('--only_geo', action='store_true')
     args = parser.parse_args()
     ntotal = 17786274
