@@ -40,5 +40,5 @@ if __name__ == '__main__':
         required=True)
     args = parser.parse_args()
     l, w = get_geo(args.geofile)
-    with open('lw.csv') as f:
+    with open('/shield/input_files/lw.csv') as f:
         f.write("{},{}\n".format(l, w))
