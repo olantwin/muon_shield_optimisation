@@ -7,6 +7,8 @@ import ROOT as r
 from sh import docker
 from common import FCN
 from skysteer import calculate_geofile
+from telegram_notify import notify as tlgrm_notify
+
 
 def get_bounds():
     dZgap = 10.
@@ -40,6 +42,7 @@ def generate_geo(geofile, params):
 
 
 def compute_FCN(params):
+    print "="*5, "compute_FCN", "="*5
     params = [70., 170.] + params  # Add constant parameters
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, compute_FCN.counter), params)
@@ -52,8 +55,7 @@ def compute_FCN(params):
             '/bin/bash', '-l', '-c', "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{}.root".format(compute_FCN.counter)
         )
     except Exception, e:
-        print "Docker finished with error:", e.stderr
-        pass
+        print "Docker finished with error, hope it is fine!"
 
     chi2s = calculate_geofile(geoFile)
     with open(os.path.join(args.workDir, 'input_files/lw.csv')) as lw_f:
@@ -61,17 +63,21 @@ def compute_FCN(params):
 
     print 'Processing results...'
     fcn = FCN(W, chi2s, L)
+    tlgrm_notify("[{}]  metric={:1.3e}".format(compute_FCN.counter, fcn))
+
     assert np.isclose(
         L / 2.,
         sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
     compute_FCN.counter += 1
+    print "="*5, "/compute_FCN", "="*5
     return fcn
 
 
 
-compute_FCN.counter = 36
+compute_FCN.counter = 1
 
 def main():
+    tlgrm_notify("Optimization restarted!")
     bounds = get_bounds()
     start = [
         # Units all in cm
