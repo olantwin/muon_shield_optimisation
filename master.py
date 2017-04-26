@@ -61,12 +61,13 @@ def compute_FCN(params):
             '/bin/bash',
             '-l',
             '-c',
-            "source /opt/FairShipRun/config.sh;"
-            " python2 /shield/code/get_geo.py"
+            "source /opt/FairShipRun/config.sh;",
+            " python2 /shield/code/get_geo.py",
             "-g /shield/input_files/geo_{}.root".format(compute_FCN.counter)
         )
     except Exception, e:
         print "Docker finished with error, hope it is fine!"
+        print e.stderr
 
     chi2s = calculate_geofile(geoFile)
     with open(os.path.join(args.workDir, 'input_files/lw.csv')) as lw_f:
@@ -159,7 +160,7 @@ def main():
         geoFile = generate_geo('geo_start.root', params)
         print 'geofile written to {}'.format(geoFile)
         return 0
-    res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=100)
+    res = forest_minimize(compute_FCN, bounds, x0=start, n_calls=1000)
     print res
     compute_FCN(res.x)
     dump(res, 'minimisation_result')
