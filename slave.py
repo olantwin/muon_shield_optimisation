@@ -106,14 +106,14 @@ def main():
                         x *= pid / 13.
                         if (P > 1 and abs(y) < 5 * u.m and
                                 (x < 2.6 * u.m and x > -3 * u.m)):
-                            w = np.sqrt(500.-(x+300.)/560.)
+                            w = np.sqrt((500.-(x+300.))/560.)
                             xs.push_back(w)
                             h['mu_p'].Fill(P)
                             if pid == 13:
                                 h['mu_w_pos'].Fill(x, y, w)
                             else:
                                 h['anti-mu_w_pos'].Fill(-x, y, w)
-    ut.writeHists(h, "test.root")
+    ut.writeHists(h, "/output/hists.root")
     with open(args.results, 'w') as f:
         f.write("{}\n".format(sum(xs)))
 

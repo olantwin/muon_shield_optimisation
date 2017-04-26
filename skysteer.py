@@ -27,7 +27,7 @@ JOB_TEMPLATE = {
             "cpu_needed" : 1,
             "max_memoryMB" : 1024,
             "min_memoryMB" : 512,
-            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} --jobid {job_id} -f /shield/worker_files/muons_{job_id}_1600.root --results /output/result.csv'",
+            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/muons_{job_id}_1600.root --results /output/result.csv'",
         },
 
         "required_outputs": {
@@ -41,6 +41,7 @@ JOB_TEMPLATE = {
 
 
 def push_jobs_for_geofile(geofile):
+    print "Submitting job for geofile ", geofile
     jobs = []
     for i in xrange(1,1601):
         tmpl = copy.deepcopy(JOB_TEMPLATE)
@@ -53,7 +54,6 @@ def push_jobs_for_geofile(geofile):
         for retry in xrange(5):
             try:
                 job = queue.put(tmpl)
-                print "Submitted job {} for worker {} and geofile {}".format(job.job_id, i, geofile)
                 jobs.append(job)
                 break
             except Exception, e:
@@ -102,13 +102,21 @@ def get_result(jobs):
 
 
 def distribute_geofile(geofile):
+    print "Running pscp for geofile ", geofile
     pscp("-r", "-h", "/home/sashab1/shield-control/hosts.txt", geofile, "/home/sashab1/ship-shield/geofiles/")
+
+
+def dump_jobs(jobs, geo_filename):
+    with open("logs/"+geo_filename+"_jobs.json", "w") as f:
+        json.dump([{"job_id": j.job_id, "output": j.output} for j in jobs], f)
 
 
 def calculate_geofile(geofile):
     distribute_geofile(geofile)
-    jobs = push_jobs_for_geofile(geofile.split("/")[-1])
+    geo_filename = geofile.split("/")[-1]
+    jobs = push_jobs_for_geofile(geo_filename)
     wait_jobs(jobs)
+    dump_jobs(jobs, geo_filename)
     return get_result(jobs)
 
 
