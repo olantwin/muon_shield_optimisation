@@ -162,6 +162,8 @@ def analyse(tree, outputfile):
             fout2.cd()
         hitlist = {}
         for hit in event.vetoPoint:
+            if abs(hit.PdgCode()) != 13:
+                continue
             lp = hit.LastPoint()
             lm = hit.LastMom()
             if lp.z() < 2597:
@@ -181,7 +183,8 @@ def analyse(tree, outputfile):
                        last_hit[1],
                        zs[-1],
                        original_muon.GetPx(),
-                       original_muon.GetPy(), original_muon.GetPz()))
+                       original_muon.GetPy(), original_muon.GetPz(),
+                       original_muon.GetWeight()))
             outtuple.fill(a)
     print 'Loop done'
     ut.writeHists(h, outputfile)
