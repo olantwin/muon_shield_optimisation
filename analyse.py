@@ -5,7 +5,7 @@ from array import array
 import numpy as np
 import ROOT as r
 from rootpy.tree import Ntuple
-from rootpy.plotting import Canvas
+from rootpy.plotting import Canvas, Hist
 import shipunit as u
 import rootUtils as ut
 from common import get_geo, FCN
@@ -98,6 +98,7 @@ def analyse(tree, outputfile):
     outtuple = Ntuple(
         ('px', 'py', 'pz', 'x', 'y', 'z', 'opx', 'opy', 'opz', 'w'),
         name='MISIS')
+    histz = Hist(100, -8000, -3000, title='#mu z position at origin')
     mom = r.TVector3()
     for event in tree:
         i += 1
@@ -186,10 +187,12 @@ def analyse(tree, outputfile):
                        original_muon.GetPy(), original_muon.GetPz(),
                        original_muon.GetWeight()))
             outtuple.fill(a)
+            histz.fill(original_muon.GetStartZ(), original_muon.GetWeight())
     print 'Loop done'
     ut.writeHists(h, outputfile)
     fout2.cd()
     outtuple.Write()
+    histz.Write()
     return xs
 
 
