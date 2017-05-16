@@ -7,17 +7,23 @@ from rootpy.plotting import Hist2D
 from rootpy.tree import Ntuple
 
 
+maxpt = 6.5
+maxp = 360.
+
+
 def cap_bins(intuple, binmax=100):
     outtuple = intuple.CloneTree(0)
-    h_all = Hist2D(100, 0, 350, 100, 0, 6, name='all')
-    h = Hist2D(100, 0, 350, 100, 0, 6, name='cap')
+    h_all = Hist2D(100, 0, maxp, 100, 0, maxpt, name='all')
+    h = Hist2D(100, 0, maxp, 100, 0, maxpt, name='cap')
     for muon in intuple:
-        px = muon.px
-        py = muon.py
-        pz = muon.pz
+        px = muon.opx
+        py = muon.opy
+        pz = muon.opz
         p = np.sqrt(px**2 + py**2 + pz**2)
         pt = np.sqrt(px**2 + py**2)
-        b = int(p / 350. * 100) + 1, int(pt / 6. * 100) + 1
+        assert p < maxp
+        assert pt < maxpt
+        b = int(p / maxp * 100) + 1, int(pt / maxpt * 100) + 1
         h_all.Fill(p, pt)
         if h[b].value < binmax:
             h.Fill(p, pt)
@@ -27,15 +33,15 @@ def cap_bins(intuple, binmax=100):
 
 
 def fill_up_bins(intuple, h, binmin=10):
-    h_added_random = Hist2D(100, 0, 350, 100, 0, 6, name='added_random')
-    h_added_mirror = Hist2D(100, 0, 350, 100, 0, 6, name='added_mirror')
+    h_added_random = Hist2D(100, 0, maxp, 100, 0, maxpt, name='added_random')
+    h_added_mirror = Hist2D(100, 0, maxp, 100, 0, maxpt, name='added_mirror')
     for muon in intuple:
-        px = muon.px
-        py = muon.py
-        pz = muon.pz
+        px = muon.opx
+        py = muon.opy
+        pz = muon.opz
         p = np.sqrt(px**2 + py**2 + pz**2)
         pt = np.sqrt(px**2 + py**2)
-        b = int(p / 350. * 100) + 1, int(pt / 6. * 100) + 1
+        b = int(p / maxp * 100) + 1, int(pt / maxpt * 100) + 1
         a = array('f', [y for x in muon.values() for y in x])
         if h[b].value < binmin:
             n = int(binmin / h[b].value)
@@ -67,10 +73,10 @@ def fill_up_bins(intuple, h, binmin=10):
 def add_problematic(intuple, n=2000):
     # TODO why aren't these saved?
     h_added_problematic = Hist2D(
-        100, 0, 350, 100, 0, 6, name='added_problematic')
+        100, 0, maxp, 100, 0, maxpt, name='added_problematic')
     pt = 2.5
     for _ in range(n):
-        p = r.gRandom.Uniform(150., 350.)
+        p = r.gRandom.Uniform(150., maxp)
         pz = np.sqrt(p**2 - pt**2)
         phi = r.gRandom.Uniform(0., 2.) * r.TMath.Pi()
         px = pt * r.TMath.Cos(phi)
@@ -125,19 +131,19 @@ def main():
     print intuple.GetEntries()
     del intuple
     intuple = out.Get('pythia8-Geant4')
-    intuple, h_added_problematic = add_problematic(intuple)
+    # intuple, h_added_problematic = add_problematic(intuple)
     intuple.Write()
     print intuple.GetEntries()
-    h_final = Hist2D(100, 0, 350, 100, 0, 6, name='final')
+    h_final = Hist2D(100, 0, maxp, 100, 0, maxpt, name='final')
     for muon in intuple:
-        px = muon.px
-        py = muon.py
-        pz = muon.pz
+        px = muon.opx
+        py = muon.opy
+        pz = muon.opz
         p = np.sqrt(px**2 + py**2 + pz**2)
         pt = np.sqrt(px**2 + py**2)
         h_final.Fill(p, pt)
     del intuple
-    h_added_problematic.Write()
+    # h_added_problematic.Write()
     h_added_random.Write()
     h_added_mirror.Write()
     h_final.Write()
