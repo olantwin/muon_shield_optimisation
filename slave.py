@@ -10,13 +10,13 @@ import shipDet_conf
 import rootUtils as ut
 
 
-def generate(inputFile, geoFile, nEvents, outFile, lofi=False):
+def generate(inputFile, geoFile, nEvents, outFile, lofi=False, seed=1):
     firstEvent = 0
     dy = 10.
     vessel_design = 5
     shield_design = 8
     mcEngine = 'TGeant4'
-    sameSeed = 1
+    sameSeed = seed
     theSeed = 1
 
     # provisionally for making studies of various muon background sources
@@ -84,7 +84,7 @@ def main():
     xs = r.std.vector('double')()
     with tempfile.NamedTemporaryFile() as t:
         outFile = t.name
-        generate(args.input, args.geofile, n, outFile, args.lofi)
+        generate(args.input, args.geofile, n, outFile, args.lofi, args.seed)
         ch = r.TChain('cbmsim')
         ch.Add(outFile)
         mom = r.TVector3()
@@ -132,6 +132,7 @@ if __name__ == '__main__':
         '--results',
         default='test.csv')
     parser.add_argument('--geofile', required=True)
+    parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('-n', '--nEvents', type=int, default=None)
     parser.add_argument('--lofi', action='store_true')
     args = parser.parse_args()
