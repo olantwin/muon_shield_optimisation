@@ -5,15 +5,11 @@ import numpy as np
 import numexpr as ne
 from skopt import forest_minimize, dump
 import ROOT as r
+from analyse import FCN
 from sh import docker
 from skysteer import calculate_geofile
 from telegram_notify import notify as tlgrm_notify
 
-
-
-def FCN(W, Sxi2, L):
-    print W, L, Sxi2
-    return float(ne.evaluate('0.01*(W/1000)*(1.+Sxi2/(1.-L/10000.))'))
 
 
 def get_bounds():
