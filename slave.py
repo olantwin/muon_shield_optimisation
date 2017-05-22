@@ -89,18 +89,17 @@ def generate(inputFile, geoFile, nEvents, outFile, lofi=False, seed=1):
 
 
 def main():
-    n = args.nEvents if args.nEvents else 100000000
+    n = args.nEvents
     # TODO read total number from muon file directly OR
     # TODO always pass from steering process?
 
-    with tempfile.NamedTemporaryFile() as t:
-        outFile = t.name
-        generate(args.input, args.geofile, n, outFile, args.lofi, args.seed)
-        chain = r.TChain('cbmsim')
-        chain.Add(outFile)
-        xs = analyse(chain, args.results)
-        with open(args.results, 'w') as f:
-            f.write("{}\n".format(sum(xs)))
+    outFile = "/output/ship.conical.MuonBack-TGeant4.root"
+    generate(args.input, args.geofile, n, outFile, args.lofi, args.seed)
+    chain = r.TChain('cbmsim')
+    chain.Add(outFile)
+    xs = analyse(chain, args.results)
+    with open(args.results, 'w') as f:
+        f.write("{}\n".format(sum(xs)))
 
 
 if __name__ == '__main__':
@@ -116,7 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--results', default='test.csv')
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--seed', type=int, default=1)
-    parser.add_argument('-n', '--nEvents', type=int, default=None)
+    parser.add_argument('-n', '--nEvents', type=int, default=10000000)
     parser.add_argument('--lofi', action='store_true')
     args = parser.parse_args()
     main()
