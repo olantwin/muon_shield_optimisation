@@ -57,6 +57,11 @@ def get_geo(geoFile):
     muonShield = sGeo.GetVolume('MuonShieldArea')
     L = magnetLength(muonShield)
     W = magnetMass(muonShield)
+    g = r.TFile.Open(geoFile, 'read')
+    params = g.Get("params")
+    f = r.TFile.Open('/shield/geo/' + os.path.basename(geoFile), 'update')
+    f.cd()
+    params.Write("params")
     return L, W
 
 
