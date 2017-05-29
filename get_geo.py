@@ -35,7 +35,13 @@ def magnetLength(muonShield):
     return length
 
 
-def get_geo(geoFile):
+def get_geo(geoFile, workDir='/shield/geo', outfile=None):
+    if not workDir[-1] == '/':
+        workDir = workDir + '/'
+    if not outfile:
+        outfile = workDir + os.path.basename(geoFile)
+    else:
+        outfile = workDir + outfile
     ship_geo = ConfigRegistry.loadpy(
         '$FAIRSHIP/geometry/geometry_config.py',
         Yheight=10,
@@ -52,14 +58,14 @@ def get_geo(geoFile):
     run.SetUserConfig('g4Config.C')
     shipDet_conf.configure(run, ship_geo)
     run.Init()
-    run.CreateGeometryFile('/shield/geo/' + os.path.basename(geoFile))
+    run.CreateGeometryFile(outfile)
     sGeo = r.gGeoManager
     muonShield = sGeo.GetVolume('MuonShieldArea')
     L = magnetLength(muonShield)
     W = magnetMass(muonShield)
     g = r.TFile.Open(geoFile, 'read')
     params = g.Get("params")
-    f = r.TFile.Open('/shield/geo/' + os.path.basename(geoFile), 'update')
+    f = r.TFile.Open(outfile, 'update')
     f.cd()
     params.Write("params")
     return L, W
