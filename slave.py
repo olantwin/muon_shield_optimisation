@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
+import os
 import argparse
-import tempfile
 import ROOT as r
 import shipunit as u
 import geomGeant4
@@ -97,9 +97,10 @@ def main():
     generate(args.input, args.geofile, n, outFile, args.lofi, args.seed)
     chain = r.TChain('cbmsim')
     chain.Add(outFile)
-    xs = analyse(chain, args.results)
+    xs = analyse(chain, args.hists)
     with open(args.results, 'w') as f:
         f.write("{}\n".format(sum(xs)))
+    os.remove(outFile)
 
 
 if __name__ == '__main__':
@@ -113,6 +114,7 @@ if __name__ == '__main__':
         '/eos/ship/data/Mbias/'
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument('--results', default='test.csv')
+    parser.add_argument('--hists', default='hists.root')
     parser.add_argument('--geofile', required=True)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('-n', '--nEvents', type=int, default=10000000)
