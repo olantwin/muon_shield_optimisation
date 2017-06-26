@@ -1,6 +1,6 @@
 from random import uniform
-import ROOT as r
 from array import array
+import ROOT as r
 
 
 def get_random_vector():
@@ -28,12 +28,17 @@ def get_bounds():
     dZ8 = (20. + zGap, 300. + zGap)
     bounds = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
     for _ in range(8):
-        minimum = 10.
-        dXIn = (minimum, 250.)
-        dXOut = (minimum, 250.)
-        dYIn = (minimum, 250.)
-        dYOut = (minimum, 250.)
+        minimum = 5.
+        dXIn = (minimum, 350.)
+        dXOut = (minimum, 350.)
+        dYIn = (minimum, 350.)
+        dYOut = (minimum, 350.)
         gapIn = (2., 498.)
         gapOut = (2., 498.)
         bounds += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
     return bounds
+
+
+def in_bounds(vector):
+    for element, bound in zip(vector, get_bounds()):
+        assert bound[0] <= element <= bound[1], "{} is not in bounds [{},{}]".format(element, *bound)

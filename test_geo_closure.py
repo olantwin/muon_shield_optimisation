@@ -1,5 +1,5 @@
 from numpy import isclose
-from common import generate_geo, get_random_vector
+from common import generate_geo, get_random_vector, in_bounds
 from get_geo import get_geo
 from reconstruct_vector import reconstruct_vector
 from rootpy.io import root_open
@@ -100,6 +100,7 @@ def test_geo_closure(tmpdir):
         2.,
         55.,
     ]
+    in_bounds(start)
     params = [70., 170.] + start  # Add constant parameters
     geo_closure(tmpdir, params)
 
