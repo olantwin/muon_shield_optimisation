@@ -11,7 +11,7 @@ from get_geo import get_geo
 
 def FCN(W, Sxi2, L):
     print W, L, Sxi2
-    return 0.01*(W/1000)*(1.+Sxi2)/(1.-L/10000.)
+    return 0.01 * (W / 1000) * (1. + Sxi2) / (1. - L / 10000.)
 
 
 def graph_tracks(event):
@@ -102,8 +102,8 @@ def analyse(tree, outputfile):
             print '{}/{}\r'.format(i, n),
         original_muon = event.MCTrack[1]
         h['smear'].Fill(original_muon.GetStartX(), original_muon.GetStartY())
+        draw = False
         for hit in event.vetoPoint:
-            draw = False
             if hit:
                 if not hit.GetEnergyLoss() > 0:
                     continue
