@@ -1,6 +1,7 @@
 #!/bin/env python2
 import os
 import argparse
+from array import array
 import ROOT as r
 from ShipGeoConfig import ConfigRegistry
 import shipDet_conf
@@ -67,6 +68,11 @@ def get_geo(geoFile, workDir='/shield/geo', outfile=None):
     params = g.Get("params")
     f = r.TFile.Open(outfile, 'update')
     f.cd()
+    length = r.TVectorD(1, array('d', [L]))
+    length.Write('length')
+    weight = r.TVectorD(1, array('d', [W]))
+    length.Write('length')
+    weight.Write('weight')
     params.Write("params")
     return L, W
 
@@ -77,7 +83,11 @@ if __name__ == '__main__':
         '-g',
         '--geofile',
         required=True)
+    parser.add_argument(
+        '-o',
+        '--output',
+        required=True)
     args = parser.parse_args()
     l, w = get_geo(args.geofile)
-    with open('/shield/input_files/lw.csv', 'w') as f:
+    with open(args.output, 'w') as f:
         f.write("{},{}\n".format(l, w))

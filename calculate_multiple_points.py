@@ -71,7 +71,7 @@ def create_geofile(params):
             '/bin/bash',
             '-l',
             '-c',
-            "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{}.root".format(fcn_id)
+            "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{0}.root -o /shield/input_files/geo_{0}.lw.csv".format(fcn_id)
         )
         print "Docker finished!"
     except Exception, e:
@@ -109,7 +109,7 @@ def compute_FCN(params):
     except Exception, e:
         tlgrm_notify("Error calculating: [{}]  {}".format(params_json, e))
         return
-    with open(os.path.join(args.workDir, 'input_files/lw.csv')) as lw_f:
+    with open(os.path.join(args.workDir, 'input_files/geo_{}.lw.csv'.format(fcn_id))) as lw_f:
         L, W = map(float, lw_f.read().strip().split(","))
 
     print 'Processing results...'
