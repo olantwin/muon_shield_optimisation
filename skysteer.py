@@ -22,12 +22,13 @@ JOB_TEMPLATE = {
 
         "container" : {
             "workdir" : "",
-            "name" : "olantwin/ship-shield:20170420",
+            "name" : "olantwin/ship-shield:20170531",
             "volumes": ["/home/sashab1/ship-shield:/shield"],
             "cpu_needed" : 1,
             "max_memoryMB" : 1024,
             "min_memoryMB" : 512,
-            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/muons_{job_id}_1600.root --results /output/result.csv'",
+            "run_id": "alexey_run2",
+            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root'",
         },
 
         "required_outputs": {
@@ -43,13 +44,9 @@ JOB_TEMPLATE = {
 def push_jobs_for_geofile(geofile):
     print "Submitting job for geofile ", geofile
     jobs = []
-    for i in xrange(1,1601):
+    for i in xrange(1, 16+1):
         tmpl = copy.deepcopy(JOB_TEMPLATE)
         tmpl['descriptor']['container']['cmd'] = tmpl['descriptor']['container']['cmd'].format(geofile=geofile, job_id=i)
-        # tmpl['descriptor']['input'] += [
-        #     "local:" + os.path.join(GEO_DIR, geofile),
-        #     "local:/home/sashab1/ship-shield/worker_files/muons_{}_1600.root".format(i),
-        # ]
 
         for retry in xrange(5):
             try:
@@ -65,6 +62,8 @@ def push_jobs_for_geofile(geofile):
 
 
 def wait_jobs(jobs):
+    wait_started = time()
+    job_submitted = {job.job_id: wait_started for job in jobs}
     completed = 0
     while True:
         sleep(60)
@@ -73,16 +72,26 @@ def wait_jobs(jobs):
         for job in jobs:
             if job.status == "completed":
                 continue
+            try:
+                job.load_from_api()
+            except:
+                pass
 
-            job.load_from_api()
             if job.status == "completed":
                 completed += 1
-            elif job.status == "failed":
+            elif job.status == "failed" or (job.status == "running" and (time() - job_submitted[job.job_id]) > 10 * 60 * 60.):
                 print "\t Resubmitting ", job.job_id
-                job.update_status("pending")
+                try:
+                    job.update_status("pending")
+                    job_submitted[job.job_id] = time()
+                except: pass
+
+            if completed == 0 and time() - wait_started > 10 * 60 * 60.:
+                print "More than 5hours passed and no jobs completed. Stopping this geofile."
+                return
 
         print "  [{}/{}]".format(completed, len(jobs))
-        if completed == 1600:
+        if completed == len(jobs):
             print time(), "All jobs completed!"
             break
 
@@ -90,7 +99,7 @@ def get_result(jobs):
     sum_result = 0.
     for job in jobs:
         if job.status != "completed":
-            print "Incomplete job while calculating result:", job.job_id
+            raise Exception("Incomplete job while calculating result:" +job.job_id)
             continue
 
         var = filter(lambda o: o.startswith("variable"), job.output)[0]
@@ -103,7 +112,15 @@ def get_result(jobs):
 
 def distribute_geofile(geofile):
     print "Running pscp for geofile ", geofile
-    pscp("-r", "-h", "/home/sashab1/shield-control/hosts.txt", geofile, "/home/sashab1/ship-shield/geofiles/")
+    if not os.path.isfile(geofile):
+        raise Exception("Geofile does not exist")
+
+    for retry in xrange(1):
+        try:
+            pscp("-r", "-h", "/home/sashab1/shield-control/hosts.txt", geofile, "/home/sashab1/ship-shield/geofiles/")
+            break
+        except Exception, e:
+            print "error in pscp:", e.stderr
 
 
 def dump_jobs(jobs, geo_filename):
@@ -121,7 +138,7 @@ def calculate_geofile(geofile):
 
 
 def main():
-    print "The result for geo_36 is:", calculate_geofile("geo_36.root")
+    print "The result for geo_1 is:", calculate_geofile("geo_1.root")
 
 if __name__ == '__main__':
     main()
