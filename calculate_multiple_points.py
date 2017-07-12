@@ -42,8 +42,10 @@ def create_geofile(params):
             "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{0}.root -o /shield/input_files/geo_{0}.lw.csv".format(fcn_id)
         )
         print "Docker finished!"
+        return True
     except Exception, e:
         print "Docker finished with error, hope it is fine!"
+        return False
 
 def geofile_worker(task_queue):
     while True:
@@ -127,7 +129,9 @@ def fcn_worker(task_queue, lockfile):
 
             lock = filelock.FileLock(lockfile)
             with lock:
-                create_geofile(params)
+                OK = create_geofile(params)
+                if not OK:
+                    continue
 
             compute_FCN(params)
         except BaseException, e:
