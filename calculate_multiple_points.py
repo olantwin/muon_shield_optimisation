@@ -10,44 +10,12 @@ from telegram_notify import notify as tlgrm_notify
 import json
 import md5
 from multiprocessing import Queue, Process
+from common import generate_geo, get_bounds
+from analyse import FCN
 
 with open("points.json") as f:
     POINTS = json.load(f)
 
-
-def FCN(W, Sxi2, L):
-    print W, L, Sxi2
-    return 0.01*(W/1000)*(1.+Sxi2)/(1.-L/10000.)
-
-def get_bounds():
-    dZgap = 10.
-    zGap = 0.5 * dZgap  # halflengh of gap
-    dZ3 = (20. + zGap, 300. + zGap)
-    dZ4 = (20. + zGap, 300. + zGap)
-    dZ5 = (20. + zGap, 300. + zGap)
-    dZ6 = (20. + zGap, 300. + zGap)
-    dZ7 = (20. + zGap, 300. + zGap)
-    dZ8 = (20. + zGap, 300. + zGap)
-    bounds = [dZ3, dZ4, dZ5, dZ6, dZ7, dZ8]
-    for _ in range(8):
-        minimum = 10.
-        dXIn = (minimum, 250.)
-        dXOut = (minimum, 250.)
-        dYIn = (minimum, 250.)
-        dYOut = (minimum, 250.)
-        gapIn = (2., 498.)
-        gapOut = (2., 498.)
-        bounds += [dXIn, dXOut, dYIn, dYOut, gapIn, gapOut]
-    return bounds
-
-
-def generate_geo(geofile, params):
-    f = r.TFile.Open(geofile, 'recreate')
-    parray = r.TVectorD(len(params), np.array(params))
-    parray.Write('params')
-    f.Close()
-    print 'Geofile constructed at ' + geofile
-    return geofile
 
 def dump_params(path, params_json_str):
     with open(path, "w") as f:
@@ -164,7 +132,6 @@ def fcn_worker(task_queue, lockfile):
             compute_FCN(params)
         except BaseException, e:
             tlgrm_notify("Exception occured for paramters: [{}]  {}".format(latest_parameters, e))
-
 
 
 def main():

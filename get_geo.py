@@ -37,7 +37,7 @@ def magnetLength(muonShield):
 
 
 def get_geo(geoFile, workDir='/shield/geo', outfile=None):
-    if not workDir[-1] == '/':
+    if workDir[-1] != '/':
         workDir = workDir + '/'
     if not outfile:
         outfile = workDir + os.path.basename(geoFile)
