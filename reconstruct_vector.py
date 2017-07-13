@@ -4,13 +4,14 @@ import click
 from rootpy.io import root_open
 import rootpy.ROOT as r
 
+
 def reconstruct_vector(geofile):
     vector = [70., 170.]
     with root_open(geofile, 'read') as f:
         geo = f.FAIRGeom
         muonshield = geo.GetVolume('MuonShieldArea')
-        magnets = {m.GetName():m for m in muonshield.GetNodes() if 'Magn' in m.GetName()}
-        lengths = [magnets['Magn{}_MiddleMagL_1'.format(i) ].GetVolume().GetShape().GetDz() + 5. for i in range(1,7)]
+        magnets = {m.GetName(): m for m in muonshield.GetNodes() if 'Magn' in m.GetName()}
+        lengths = [magnets['Magn{}_MiddleMagL_1'.format(i)].GetVolume().GetShape().GetDz() + 5. for i in range(1,7)]
         vector += lengths
         anti_overlap = 0.1
         for magnetname in ['MagnAbsorb{}'.format(i) for i in (1,2)] + ['Magn{}'.format(i) for i in range(1,7)]:

@@ -71,7 +71,6 @@ def get_geo(geoFile, workDir='/shield/geo', outfile=None):
     length = r.TVectorD(1, array('d', [L]))
     length.Write('length')
     weight = r.TVectorD(1, array('d', [W]))
-    length.Write('length')
     weight.Write('weight')
     params.Write("params")
     return L, W
