@@ -27,7 +27,7 @@ JOB_TEMPLATE = {
             "cpu_needed" : 1,
             "max_memoryMB" : 1024,
             "min_memoryMB" : 512,
-            "run_id": "alexey_run2",
+            "run_id": "near_run3",
             "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root'",
         },
 
@@ -63,7 +63,8 @@ def push_jobs_for_geofile(geofile):
 
 def wait_jobs(jobs):
     wait_started = time()
-    job_submitted = {job.job_id: wait_started for job in jobs}
+    job_metadata = {job.job_id: {"resubmits": 0, "last_update": wait_started} for job in jobs}
+    # job_submitted = {job.job_id: wait_started for job in jobs}
     completed = 0
     while True:
         sleep(60)
@@ -79,16 +80,21 @@ def wait_jobs(jobs):
 
             if job.status == "completed":
                 completed += 1
-            elif job.status == "failed" or (job.status == "running" and (time() - job_submitted[job.job_id]) > 10 * 60 * 60.):
+            elif job.status == "failed" or (job.status == "running" and (time() - job_metadata[job.job_id]['last_update']) > 10 * 60 * 60.):
                 print "\t Resubmitting ", job.job_id
                 try:
                     job.update_status("pending")
-                    job_submitted[job.job_id] = time()
+                    job_metadata[job.job_id]['last_update'] = time()
+                    job_metadata[job.job_id]['resubmits'] += 1
                 except: pass
 
-            if completed == 0 and time() - wait_started > 10 * 60 * 60.:
-                print "More than 5hours passed and no jobs completed. Stopping this geofile."
-                return
+            timeout_passed = time() - wait_started > 10 * 60 * 60.
+            too_many_resubmits = any([v['resubmits'] > 5 for k,v in job_metadata.items()])
+            if completed == 0 and (timeout_passed or too_many_resubmits):
+                if timeout_passed:
+                    raise Exception("More than 10hours passed and no jobs completed.")
+                else:
+                    raise Exception("Too many resubmits, canceling execution")
 
         print "  [{}/{}]".format(completed, len(jobs))
         if completed == len(jobs):

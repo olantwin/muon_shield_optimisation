@@ -11,7 +11,7 @@ import json
 import md5
 from multiprocessing import Queue, Process
 from common import generate_geo, get_bounds
-from analyse import FCN
+from fcn import FCN
 
 with open("points.json") as f:
     POINTS = json.load(f)
@@ -140,7 +140,7 @@ def fcn_worker(task_queue, lockfile):
 
 def main():
     task_queue = Queue()
-    n_workers = 100
+    n_workers = 98
 
     for params in POINTS:
         task_queue.put(params)
