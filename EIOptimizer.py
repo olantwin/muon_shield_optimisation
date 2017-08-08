@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 from scipy.optimize import minimize
+from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.preprocessing import StandardScaler
 import GPy
 
@@ -25,7 +26,7 @@ class EIOptimizer():
         self.y_normalized = self.y_scaler.fit_transform(y.reshape(-1, 1))
         kernel = GPy.kern.RBF(input_dim=self.input_dimension, variance=0.1, lengthscale=0.1,
                              ARD=True)
-        kernel.lengthscale.constrain_bounded(0.001, 10.0) 
+        kernel.lengthscale.constrain_bounded(0.001, 10.) 
         kernel.variance.constrain_bounded(0.001, 100.0) 
         self.gp_model = GPy.models.GPRegression(self.X_normalized, self.y_normalized, kernel)
         self.gp_model.Gaussian_noise.constrain_bounded(1e-4, 10.0)
@@ -64,5 +65,16 @@ class EIOptimizer():
                               options={'disp': False}, bounds=self.wrap(initial_guess[i]))
             polished_points.append(result.x)
             polished_values.append(result.fun[0])
-        top_inds = np.argsort(np.array(polished_values))[:n_samples]
-        return self.min_bounds + (self.max_bounds - self.min_bounds) * np.array(polished_points)[top_inds]
+        polished_points = np.array(polished_points)
+        polished_values = np.array(polished_values)
+        top_inds = np.array([np.argmin(polished_values)])
+        min_dist = 0.1
+        while len(top_inds) < n_samples:
+            D = pairwise_distances(polished_points, polished_points[top_inds])
+            d = np.min(D, axis = 1)
+            candidates = np.where(d > min_dist)[0]
+            if len(candidates) == 0:
+                min_dist /= 2
+            else:
+                top_inds = np.hstack((top_inds, candidates[np.argmin(polished_values[candidates])]))    
+        return self.min_bounds + (self.max_bounds - self.min_bounds) * polished_points[top_inds]
