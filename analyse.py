@@ -10,7 +10,6 @@ from get_geo import get_geo
 from fcn import FCN
 
 
-
 def graph_tracks(event):
     """Create graphs of tracks in event by interpolating between vetoPoints."""
     hits = []
@@ -72,6 +71,8 @@ def analyse(tree, outputfile):
     r.gROOT.SetBatch(True)
     maxpt = 6.5
     maxp = 360.
+    f = r.TFile.Open(outputfile, 'recreate')
+    f.cd()
     h = {}
     ut.bookHist(h, 'mu_pos', '#mu- hits;x[cm];y[cm]', 100, -1000, +1000, 100,
                 -800, 1000)
@@ -91,7 +92,6 @@ def analyse(tree, outputfile):
     xs = r.std.vector('double')()
     i, n = 0, tree.GetEntries()
     print '0/{}\r'.format(n),
-    fout = r.TFile.Open('gallery.root', 'recreate')
     mom = r.TVector3()
     for event in tree:
         i += 1
@@ -127,10 +127,10 @@ def analyse(tree, outputfile):
                                                   original_muon.GetPt())
                         if pid == 13:
                             h['mu_w_pos'].Fill(x, y, w)
+                            draw = 4
                         else:
                             h['anti-mu_w_pos'].Fill(-x, y, w)
-                    if (P > 1) and (x < 2.6 * u.m) and (abs(y) < 5 * u.m):
-                        draw = 4 if pid > 0 else 6
+                            draw = 6
         if draw:
             graph_x, graph_y = graph_tracks(event)
             graph_x.SetLineColor(draw)
@@ -152,10 +152,13 @@ def analyse(tree, outputfile):
             multigraph.Add(graph_y, 'lp')
             multigraph.Draw('Alp')
             c.BuildLegend()
-            fout.cd()
             c.Write()
     print 'Loop done'
-    ut.writeHists(h, outputfile)
+    for key in h:
+        classname = h[key].Class().GetName()
+        if 'TH' in classname or 'TP' in classname:
+            h[key].Write()
+    f.close()
     return xs
 
 
