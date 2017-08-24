@@ -102,7 +102,7 @@ def main():
             while True:
                 try:
                     opt_gp = Optimizer(space, GaussianProcessRegressor(alpha=alpha, normalize_y=True))
-                    opt_gb.tell(X_0, y_0)
+                    opt_gp.tell(X_0, y_0)
                     break
                 except:
                     alpha *= 10
