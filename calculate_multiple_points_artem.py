@@ -12,9 +12,23 @@ import md5
 from multiprocessing import Queue, Process
 from common import generate_geo, get_bounds
 from fcn import FCN
+import MySQLdb
+import exceptions
+import logging
+import time
+from downloader import create_merged_file
+
+DB_CONF = dict(
+    host='2a03:b0c0:1:d0::2c4f:1001',
+    user='root',
+    passwd='P@ssw0rd',
+    db='points_prod'
+)
+
 
 with open("points.json") as f:
     POINTS = json.load(f)
+    f.close()
 
 
 def dump_params(path, params_json_str):
@@ -30,8 +44,9 @@ def create_geofile(params):
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, fcn_id), params)
 
+    log = logging.getLogger('create_geofile')
     try:
-        print "Running docker: " + params_json
+        log.info("Running docker: " + params_json)
         docker.run(
             "--rm",
             "-v", "{}:/shield".format(args.workDir),
@@ -41,10 +56,10 @@ def create_geofile(params):
             '-c',
             "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{0}.root -o /shield/input_files/geo_{0}.lw.csv".format(fcn_id)
         )
-        print "Docker finished!"
+        log.info("Docker finished!")
         return True
     except Exception, e:
-        print "Docker finished with error, hope it is fine!"
+        log.exception('Docker finished with error, hope it is fine! {}'.format(e))
         return False
 
 def geofile_worker(task_queue):
@@ -54,43 +69,79 @@ def geofile_worker(task_queue):
             break
         create_geofile(params)
 
+def insert_hist(fcn_id, id):
+    db = MySQLdb.connect(**DB_CONF)
+    cur = db.cursor()
 
-def compute_FCN(params):
-    params_json = json.dumps(params)
-    h = md5.new()
-    h.update(params_json)
-    fcn_id = h.hexdigest()
+    try:
+        create_merged_file('logs/geo_{}.root_jobs.json'.format(fcn_id))
+    except:
+        return
 
-    print "="*5, "compute_FCN:{}".format(fcn_id), "="*5
+    with open('./hists/geo_{}.root'.format(fcn_id)) as file:
+        cur.execute('UPDATE points_results SET hist = %s WHERE id = %s', (file.read(), id))
+        db.commit()
+        file.close()
+
+    return
+
+
+def compute_FCN(params, fcn_id):
+    id = params[-1]
+
+    db = MySQLdb.connect(**DB_CONF)
+    cur = db.cursor()
+
+    log = logging.getLogger('compute_fcn')
+    log.info("="*5 + "compute_FCN:{}".format(fcn_id) + "="*5)
 
     dump_params(
         '{}/params/{}.json'.format(args.workDir, fcn_id),
         params_json
     )
+    cur.execute('''UPDATE points_results SET status = 'running' WHERE id = '{}' '''.format(id))
+    db.commit()
+
+    cur.execute('SELECT resampled FROM points_results WHERE id = {}'.format(id))
+    sampling = int(cur.fetchall()[0][0])
 
     geoFile = '{}/input_files/geo_{}.root'.format(args.workDir, fcn_id)
     if not os.path.isfile(geoFile):
-        print "Geofile does not exist, exiting!"
+        log.error("Geofile does not exist, exiting!")
+        cur.execute('UPDATE points_results SET geofile_exception = %s WHERE id = %s', (True, id))
+        db.commit()
+        db.close()
         return
 
     chi2s = 0
     try:
-        chi2s = calculate_geofile(geoFile)
+        chi2s = calculate_geofile(geoFile, sampling)
     except Exception, e:
+        log.exception(e)
+        cur.execute('UPDATE points_results SET geofile_exception = %s WHERE id = %s', (True, id))
+        db.commit()
+        db.close()
         tlgrm_notify("Error calculating: [{}]  {}".format(params_json, e))
         return
+
     with open(os.path.join(args.workDir, 'input_files/geo_{}.lw.csv'.format(fcn_id))) as lw_f:
         L, W = map(float, lw_f.read().strip().split(","))
 
-    print 'Processing results...'
+    insert_hist(fcn_id, id)
+
+    log.info('Processing results...')
     fcn = FCN(W, chi2s, L)
-    tlgrm_notify("[{}]  metric={:1.3e}".format(params_json, fcn))
+    tlgrm_notify("[{}]\nresampled={}\nid={}\nweight={}\nchi2={}\nmetric={:1.3e}".format(params_json, sampling, fcn_id, W, chi2s, fcn))
+
+    cur.execute('UPDATE points_results SET weight = %s, metric_1 = %s, chi2 = %s, status = %s WHERE id = %s', (W, fcn, chi2s, 'completed', id))
+    db.commit()
+    db.close()
 
     assert np.isclose(
         L / 2.,
         sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
 
-    print "="*5, "/compute_FCN", "="*5
+    log.info("="*5 + "/compute_FCN" + "="*5)
 
 
 def batch(iterable, n=1):
@@ -125,18 +176,37 @@ def fcn_worker(task_queue, lockfile):
             if not params:
                 break
 
-            latest_parameters = params
+            params_json = json.dumps(params[:-1])
+            h = md5.new()
+            h.update(params_json)
+            fcn_id = h.hexdigest()
+
+            latest_parameters = params[:-1]
 
             lock = filelock.FileLock(lockfile)
             with lock:
-                create_geofile(params)
+                result = create_geofile(params[:-1])
 
-            compute_FCN(params)
+            compute_FCN(params, fcn_id)
+
         except BaseException, e:
+            log = logging.getLogger('fcn_worker')
+            log.exception(e)
+
+            db = MySQLdb.connect(**DB_CONF)
+            cur = db.cursor()
+
+            cur.execute('UPDATE points_results SET params_exception = %s WHERE id = %s', (True, params[-1]))
+            db.commit()
+            db.close()
+
             tlgrm_notify("Exception occured for paramters: [{}]  {}".format(latest_parameters, e))
 
 
 def main():
+    logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format = "%(asctime)s %(process)s %(thread)s: %(message)s")
+
+    '''
     task_queue = Queue()
     n_workers = 98
 
@@ -154,6 +224,43 @@ def main():
 
     for p in processes:
         p.join()
+    '''
+    n_workers = 98
+    processes = []
+    try:
+        while True:
+            POINTS = []
+            while True:
+                with open('points_to_run/run.json', 'r+') as f:
+                    if len(f.read()) > 0:
+                        f.seek(0)
+                        POINTS += json.load(f)
+                        f.seek(0)
+                        f.truncate()
+                    f.close()
+                    
+                if len(POINTS) > 0:
+                    break
+                else:        
+                    time.sleep(10)
+
+            task_queue = Queue()
+            for params in POINTS:
+                task_queue.put(params)
+
+            for worker_id in xrange(n_workers):
+                task_queue.put(None)
+                lockfile = "/tmp/shield-{}.lock".format((worker_id + 1) % 15)
+                p = Process(target=fcn_worker, args=(task_queue, lockfile))
+                p.start()
+                processes.append(p)
+                
+    except exceptions.KeyboardInterrupt:
+        logging.info('Wait until tasks complete...')
+        print 'Wait until tasks complete...'
+        for p in processes:
+            p.join()
+
 
 
     # for params_batch in batch(POINTS, 50):

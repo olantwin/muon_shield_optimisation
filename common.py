@@ -1,6 +1,7 @@
 from random import uniform
 from array import array
 import ROOT as r
+import logging
 
 
 def get_random_vector():
@@ -13,7 +14,7 @@ def generate_geo(geofile, params):
     parray = r.TVectorD(len(params), array('d', params))
     parray.Write('params')
     f.Close()
-    print 'Geofile constructed at ' + geofile
+    logging.info('Geofile constructed at ' + geofile)
     return geofile
 
 

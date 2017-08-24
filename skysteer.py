@@ -6,6 +6,7 @@ from time import sleep, time
 import copy
 import traceback
 from sh import pscp
+import logging
 
 
 METASCHEDULER_URL = "http://metascheduler.cern.tst.yandex.net/"
@@ -28,7 +29,7 @@ JOB_TEMPLATE = {
             "max_memoryMB" : 1024,
             "min_memoryMB" : 512,
             "run_id": "near_run3",
-            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root'",
+            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/sampling_{sampling}/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root'",
         },
 
         "required_outputs": {
@@ -41,12 +42,12 @@ JOB_TEMPLATE = {
 }
 
 
-def push_jobs_for_geofile(geofile):
-    print "Submitting job for geofile ", geofile
+def push_jobs_for_geofile(geofile, sampling):
+    logging.info("Submitting job for geofile {}".format(geofile))
     jobs = []
     for i in xrange(1, 16+1):
         tmpl = copy.deepcopy(JOB_TEMPLATE)
-        tmpl['descriptor']['container']['cmd'] = tmpl['descriptor']['container']['cmd'].format(geofile=geofile, job_id=i)
+        tmpl['descriptor']['container']['cmd'] = tmpl['descriptor']['container']['cmd'].format(geofile=geofile, job_id=i, sampling=sampling)
 
         for retry in xrange(5):
             try:
@@ -55,20 +56,32 @@ def push_jobs_for_geofile(geofile):
                 break
             except Exception, e:
                 traceback.print_exc()
-                print "Got exception ", e
+                logging.exception("Got exception {}".format(e.stderr))
 
-    print time(), "Pushed geofile ", geofile
+    logging.info("{} Pushed geofile: {}".format(time(), geofile))
     return jobs
 
 
+def is_failed_due_to_docker(job):
+    for retry in xrange(5):
+        try:
+            debug = job.get_debug() or {}
+            return "devmapper" in debug.get('exception', "")
+        except Exception, e:
+            traceback.print_exc()
+            logging.exception("Got exception {}".format(e.stderr))
+    return False
+
+
 def wait_jobs(jobs):
+    log = logging.getLogger('wait jobs')
     wait_started = time()
     job_metadata = {job.job_id: {"resubmits": 0, "last_update": wait_started} for job in jobs}
     # job_submitted = {job.job_id: wait_started for job in jobs}
     completed = 0
     while True:
         sleep(60)
-        print time(), " Checking jobs for completeness...",
+        log.info(str(time()) +  " Checking jobs for completeness...")
 
         for job in jobs:
             if job.status == "completed":
@@ -81,43 +94,46 @@ def wait_jobs(jobs):
             if job.status == "completed":
                 completed += 1
             elif job.status == "failed" or (job.status == "running" and (time() - job_metadata[job.job_id]['last_update']) > 10 * 60 * 60.):
-                print "\t Resubmitting ", job.job_id
+                log.info("\t Resubmitting {} {}".format(job.job_id, job.status))
                 try:
                     job.update_status("pending")
                     job_metadata[job.job_id]['last_update'] = time()
-                    job_metadata[job.job_id]['resubmits'] += 1
+
+                    if not is_failed_due_to_docker(job):
+                        job_metadata[job.job_id]['resubmits'] += 1
                 except: pass
 
             timeout_passed = time() - wait_started > 10 * 60 * 60.
-            too_many_resubmits = any([v['resubmits'] > 5 for k,v in job_metadata.items()])
+            too_many_resubmits = all([v['resubmits'] > 5 for k,v in job_metadata.items()])
             if completed == 0 and (timeout_passed or too_many_resubmits):
                 if timeout_passed:
-                    raise Exception("More than 10hours passed and no jobs completed.")
+                    raise Exception("More than 2 hours passed and no jobs completed.")
                 else:
                     raise Exception("Too many resubmits, canceling execution")
 
-        print "  [{}/{}]".format(completed, len(jobs))
+        log.info("  [{}/{}]".format(completed, len(jobs)))
         if completed == len(jobs):
-            print time(), "All jobs completed!"
+            log.info("{} All jobs completed!".format(time()))
             break
 
 def get_result(jobs):
     sum_result = 0.
     for job in jobs:
         if job.status != "completed":
-            raise Exception("Incomplete job while calculating result:" +job.job_id)
+            raise Exception("Incomplete job while calculating result: {}".format(job.job_id))
             continue
 
         var = filter(lambda o: o.startswith("variable"), job.output)[0]
         result = float(var.split(":", 1)[1].split("=", 1)[1])
         sum_result += result
 
-    print "Sum: ", sum_result
+    logging.info("Sum: {}".format(sum_result))
     return sum_result
 
 
 def distribute_geofile(geofile):
-    print "Running pscp for geofile ", geofile
+    log = logging.getLogger('distribute_geofile')
+    log.info("Running pscp for geofile {}".format(geofile))
     if not os.path.isfile(geofile):
         raise Exception("Geofile does not exist")
 
@@ -126,7 +142,7 @@ def distribute_geofile(geofile):
             pscp("-r", "-h", "/home/sashab1/shield-control/hosts.txt", geofile, "/home/sashab1/ship-shield/geofiles/")
             break
         except Exception, e:
-            print "error in pscp:", e.stderr
+            log.exception("error in pscp: {}".format(e.stderr))
 
 
 def dump_jobs(jobs, geo_filename):
@@ -134,17 +150,19 @@ def dump_jobs(jobs, geo_filename):
         json.dump([{"job_id": j.job_id, "output": j.output} for j in jobs], f)
 
 
-def calculate_geofile(geofile):
+def calculate_geofile(geofile, sampling):
     distribute_geofile(geofile)
     geo_filename = geofile.split("/")[-1]
-    jobs = push_jobs_for_geofile(geo_filename)
+    jobs = push_jobs_for_geofile(geo_filename, sampling)
+    dump_jobs(jobs, geo_filename)
     wait_jobs(jobs)
     dump_jobs(jobs, geo_filename)
     return get_result(jobs)
 
 
 def main():
-    print "The result for geo_1 is:", calculate_geofile("geo_1.root")
+    logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format = "%(asctime)s %(process)s %(thread)s: %(message)s")
+    logging.info("The result for geo_1 is: {}".format(calculate_geofile("geo_1.root")))
 
 if __name__ == '__main__':
     main()
