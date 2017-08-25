@@ -1,16 +1,15 @@
 #!/usr/bin/env python2
-import filelock
 import os
 import argparse
+import json
+from multiprocessing import Queue, Process
 import numpy as np
 import ROOT as r
+import filelock
 from sh import docker
 from skysteer import calculate_geofile
 from telegram_notify import notify as tlgrm_notify
-import json
-import md5
-from multiprocessing import Queue, Process
-from common import generate_geo, get_bounds
+from common import generate_geo, create_id
 from fcn import FCN
 
 with open("points.json") as f:
@@ -22,10 +21,7 @@ def dump_params(path, params_json_str):
         f.write(params_json_str)
 
 def create_geofile(params):
-    params_json = json.dumps(params)
-    h = md5.new()
-    h.update(params_json)
-    fcn_id = h.hexdigest()
+    fcn_id = create_id(params)
 
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, fcn_id), params)
@@ -56,10 +52,7 @@ def geofile_worker(task_queue):
 
 
 def compute_FCN(params):
-    params_json = json.dumps(params)
-    h = md5.new()
-    h.update(params_json)
-    fcn_id = h.hexdigest()
+    fcn_id = create_id(params)
 
     print "="*5, "compute_FCN:{}".format(fcn_id), "="*5
 

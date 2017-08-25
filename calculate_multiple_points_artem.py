@@ -1,21 +1,20 @@
 #!/usr/bin/env python2
-import filelock
 import os
 import argparse
-import numpy as np
-import ROOT as r
-from sh import docker
-from skysteer import calculate_geofile
-from telegram_notify import notify as tlgrm_notify
 import json
-import md5
 from multiprocessing import Queue, Process
-from common import generate_geo, get_bounds
-from fcn import FCN
-import MySQLdb
 import exceptions
 import logging
 import time
+import numpy as np
+import ROOT as r
+import filelock
+from sh import docker
+from skysteer import calculate_geofile
+from telegram_notify import notify as tlgrm_notify
+from common import generate_geo, create_id
+from fcn import FCN
+import MySQLdb
 from downloader import create_merged_file
 
 DB_CONF = dict(
@@ -36,10 +35,7 @@ def dump_params(path, params_json_str):
         f.write(params_json_str)
 
 def create_geofile(params):
-    params_json = json.dumps(params)
-    h = md5.new()
-    h.update(params_json)
-    fcn_id = h.hexdigest()
+    fcn_id = create_id(params)
 
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, fcn_id), params)
@@ -176,10 +172,7 @@ def fcn_worker(task_queue, lockfile):
             if not params:
                 break
 
-            params_json = json.dumps(params[:-1])
-            h = md5.new()
-            h.update(params_json)
-            fcn_id = h.hexdigest()
+            fcn_id = create_id(params[:-1])
 
             latest_parameters = params[:-1]
 
