@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 import MySQLdb
 from skopt import Optimizer
+from skopt import Space
 import numpy as np
 import exceptions
 import time
@@ -79,40 +80,6 @@ def is_inspace(x):
     return True
 
 
-def compute_space_low(_):
-    low = [
-        70.0, 170.0, 205.0, 205.0, 280.0, 245.0, 305.0, 240.0, 40.0, 40.0,
-        150.0, 150.0, 2.0, 2.0, 80.0, 80.0, 150.0, 150.0, 2.0, 2.0, 35.0, 35.0,
-        35.0, 35.0, 10.0, 10.0, 35.0, 35.0, 35.0, 35.0, 10.0, 10.0, 35.0, 35.0,
-        35.0, 35.0, 10.0, 10.0, 35.0, 35.0, 35.0, 35.0, 10.0, 10.0, 35.0, 35.0,
-        35.0, 35.0, 10.0, 10.0, 35.0, 35.0, 35.0, 35.0, 10.0, 10.0
-    ]
-    hi = [
-        70.0, 170.0, 208.39184522611606, 207.53816071811292, 281.8910656618243,
-        249.34702114707295, 304.403439538938, 245.90575227555678, 40.0, 40.0,
-        150.0, 150.0, 2.0, 2.0, 80.0, 80.0, 150.0, 150.0, 2.0, 2.0,
-        85.841851066965, 64.31496565785005, 27.802219875792293,
-        119.25247386380309, 8.108811398186436, 4.402705185702148,
-        67.14942990400131, 37.8996033216964, 117.62678379584712,
-        203.5633809445522, 14.506304034900413, 2.45195898281762,
-        7.221614450090608, 28.24581154011487, 34.28950718125761,
-        10.34685839306723, 74.0331130750956, 11.842670584084932,
-        0.9074198672528166, 23.3694606234195, 105.12739503273659,
-        3.317494355267905, 6.2994064239524885, 6.515045579521841,
-        11.707623167975962, 29.93041656517568, 230.9257892268813,
-        33.73211925562083, 7.732577775355542, 13.787181359953731,
-        31.648063489301446, 87.89784531395614, 187.02921494326026,
-        311.093876810969, 2.8251248638768125, 52.399472683397704
-    ]
-    space = []
-    for i in range(2, 8):
-        space.append((min(low[i], hi[i]), max(low[i], hi[i])))
-    for i in range(20, 56):
-        space.append((min(low[i], hi[i]), max(low[i], hi[i])))
-
-    return space
-
-
 def parse_params(params_string):
     return [float(x) for x in params_string.strip('[]').split(',')]
 
@@ -132,7 +99,7 @@ def main():
     while True:
         try:
             cur.execute(
-                '''SELECT params, metric_1 FROM points_results WHERE metric_1 IS NOT NULL'''
+                '''SELECT params, metric_1 FROM points_results WHERE metric_1 IS NOT NULL AND tag = 'discrete' '''
             )
             data = cur.fetchall()
 
@@ -157,19 +124,25 @@ def main():
                 acq_optimizer='sampling')
 
             print 'Start to tell points.'
-            opt_rf.tell(X_0, y_0)
-            opt_gb.tell(X_0, y_0)
+            if len(X_0) != 0:
+                opt_rf.tell(X_0, y_0)
+                opt_gb.tell(X_0, y_0)
 
-            alpha = 1e-7
-            while True:
-                try:
-                    opt_gp = Optimizer(space,
-                                       GaussianProcessRegressor(
-                                           alpha=alpha, normalize_y=True))
-                    opt_gp.tell(X_0, y_0)
-                    break
-                except BaseException:
-                    alpha *= 10
+                alpha = 1e-7
+                while True:
+                    try:
+                        opt_gp = Optimizer(space,
+                                           GaussianProcessRegressor(
+                                               alpha=alpha, normalize_y=True))
+                        opt_gp.tell(X_0, y_0)
+                        break
+                    except BaseException:
+                        alpha *= 10
+            else:
+                opt_gp = Optimizer(space,
+                                    GaussianProcessRegressor(
+                                    alpha=1e-7, normalize_y=True))
+
 
             optimizers = ['rf', 'gb', 'gp']
 
@@ -181,11 +154,7 @@ def main():
                 n_points=batch_size / fraction) + opt_gp.ask(
                     n_points=batch_size / fraction)
 
-            for i in range(30):
-                point = []
-                for dimension in space:
-                    point += dimension.rvs()
-                points.append(point)
+            points += Space(space).rvs(n_samples=30)
 
             # modify points
             points = [add_fixed_params(p) for p in points]
@@ -194,7 +163,7 @@ def main():
                 for j in range(batch_size / fraction):
                     index = i * (batch_size / fraction) + j
                     cur.execute(
-                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status) VALUES (%s, %s, %s, 'Artem', 37, 'waiting') ''',
+                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', 'discrete') ''',
                         (create_id(points[index]), str(points[index]),
                          optimizers[i]))
             db.commit()
