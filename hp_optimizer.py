@@ -132,7 +132,7 @@ def main():
                     try:
                         opt_gp = Optimizer(space,
                                            GaussianProcessRegressor(
-                                               alpha=alpha, normalize_y=True))
+                                               alpha=alpha, normalize_y=True, noise='gaussian'))
                         opt_gp.tell(X_0, y_0)
                         break
                     except BaseException:
@@ -140,7 +140,7 @@ def main():
             else:
                 opt_gp = Optimizer(space,
                                    GaussianProcessRegressor(
-                                       alpha=1e-7, normalize_y=True))
+                                       alpha=1e-7, normalize_y=True, noise='gaussian'))
 
             optimizers = ['rf', 'gb', 'gp']
 
