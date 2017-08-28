@@ -1,17 +1,16 @@
 #!/usr/bin/env python2
-import MySQLdb
-from skopt import Optimizer
-from skopt import Space
-import numpy as np
 import exceptions
 import time
+import md5
+import json
+import MySQLdb
+import numpy as np
+from sklearn.ensemble import GradientBoostingRegressor
+from skopt import Optimizer
 from skopt.learning import GaussianProcessRegressor
 from skopt.learning import RandomForestRegressor
 from skopt.learning import GradientBoostingQuantileRegressor
-import md5
-import json
-from sklearn.ensemble import GradientBoostingRegressor
-from skopt.space.space import Integer
+from skopt.space.space import Integer, Space
 
 target_points_in_time = 100
 fixed = [
@@ -58,14 +57,14 @@ def compute_space(X_0):
 def discrete_space():
     dZgap = 10
     zGap = dZgap / 2  # halflengh of gap
-    return 6 * [
+    return Space(6 * [
         Integer(20 + zGap, 300 + zGap)  # magnet lengths
     ] + 6 * (
         4 * [
             Integer(10, 250)  # dXIn, dXOut, dYIn, dYOut
         ] + 2 * [
             Integer(2, 100)  # gapIn, gapOut
-        ])
+        ]))
 
 
 def is_inspace(x):
@@ -140,9 +139,8 @@ def main():
                         alpha *= 10
             else:
                 opt_gp = Optimizer(space,
-                                    GaussianProcessRegressor(
-                                    alpha=1e-7, normalize_y=True))
-
+                                   GaussianProcessRegressor(
+                                       alpha=1e-7, normalize_y=True))
 
             optimizers = ['rf', 'gb', 'gp']
 
@@ -154,7 +152,7 @@ def main():
                 n_points=batch_size / fraction) + opt_gp.ask(
                     n_points=batch_size / fraction)
 
-            points += Space(space).rvs(n_samples=30)
+            points += space.rvs(n_samples=30)
 
             # modify points
             points = [add_fixed_params(p) for p in points]
