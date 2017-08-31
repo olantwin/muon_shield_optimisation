@@ -29,7 +29,7 @@ JOB_TEMPLATE = {
             "max_memoryMB" : 1024,
             "min_memoryMB" : 512,
             "run_id": "near_run3",
-            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/sampling_{sampling}/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root'",
+            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/sampling_{sampling}/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root --seed {seed}'",
         },
 
         "required_outputs": {
@@ -42,12 +42,12 @@ JOB_TEMPLATE = {
 }
 
 
-def push_jobs_for_geofile(geofile, sampling):
+def push_jobs_for_geofile(geofile, sampling, seed):
     logging.info("Submitting job for geofile {}".format(geofile))
     jobs = []
     for i in xrange(1, 16+1):
         tmpl = copy.deepcopy(JOB_TEMPLATE)
-        tmpl['descriptor']['container']['cmd'] = tmpl['descriptor']['container']['cmd'].format(geofile=geofile, job_id=i, sampling=sampling)
+        tmpl['descriptor']['container']['cmd'] = tmpl['descriptor']['container']['cmd'].format(geofile=geofile, job_id=i, sampling=sampling, seed=seed)
 
         for retry in xrange(5):
             try:
@@ -150,10 +150,10 @@ def dump_jobs(jobs, geo_filename):
         json.dump([{"job_id": j.job_id, "output": j.output} for j in jobs], f)
 
 
-def calculate_geofile(geofile, sampling):
+def calculate_geofile(geofile, sampling, seed):
     distribute_geofile(geofile)
     geo_filename = geofile.split("/")[-1]
-    jobs = push_jobs_for_geofile(geo_filename, sampling)
+    jobs = push_jobs_for_geofile(geo_filename, sampling, seed)
     dump_jobs(jobs, geo_filename)
     wait_jobs(jobs)
     dump_jobs(jobs, geo_filename)
