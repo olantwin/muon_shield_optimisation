@@ -1,20 +1,22 @@
 #!/usr/bin/env python2
+import filelock
 import os
 import argparse
-import json
-from multiprocessing import Queue, Process
-import exceptions
-import logging
-import time
 import numpy as np
 import ROOT as r
-import filelock
 from sh import docker
 from skysteer import calculate_geofile
 from telegram_notify import notify as tlgrm_notify
-from common import generate_geo, create_id
+#from telegram_notify import notify_image as tlgrm_image
+import json
+import md5
+from multiprocessing import Queue, Process
+from common import generate_geo, get_bounds
 from fcn import FCN
 import MySQLdb
+import exceptions
+import logging
+import time
 from downloader import create_merged_file
 
 DB_CONF = dict(
@@ -35,7 +37,10 @@ def dump_params(path, params_json_str):
         f.write(params_json_str)
 
 def create_geofile(params):
-    fcn_id = create_id(params)
+    params_json = json.dumps(params)
+    h = md5.new()
+    h.update(params_json)
+    fcn_id = h.hexdigest()
 
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
         args.workDir, fcn_id), params)
@@ -78,8 +83,18 @@ def insert_hist(fcn_id, id):
         cur.execute('UPDATE points_results SET hist = %s WHERE id = %s', (file.read(), id))
         db.commit()
         file.close()
+    db.close()
 
-    return
+def insert_geofile(fcn_id, id):
+    db = MySQLdb.connect(**DB_CONF)
+    cur = db.cursor()
+
+    with open('./files/geo/geo_{}.root'.format(fcn_id)) as file:
+        cur.execute('UPDATE points_results SET geofile = %s WHERE id = %s', (file.read(), id))
+        db.commit()
+        file.close()
+
+    db.close()
 
 
 def compute_FCN(params, fcn_id):
@@ -87,6 +102,8 @@ def compute_FCN(params, fcn_id):
 
     db = MySQLdb.connect(**DB_CONF)
     cur = db.cursor()
+
+    params_json = json.dumps(params[:-1])
 
     log = logging.getLogger('compute_fcn')
     log.info("="*5 + "compute_FCN:{}".format(fcn_id) + "="*5)
@@ -98,8 +115,16 @@ def compute_FCN(params, fcn_id):
     cur.execute('''UPDATE points_results SET status = 'running' WHERE id = '{}' '''.format(id))
     db.commit()
 
-    cur.execute('SELECT resampled FROM points_results WHERE id = {}'.format(id))
-    sampling = int(cur.fetchall()[0][0])
+    cur.execute('SELECT resampled, seed FROM points_results WHERE id = {}'.format(id))
+    sampling, seed = list(cur.fetchall()[0])
+
+    if seed is None:
+        seed = np.random.randint(0, 100)
+
+    sampling = int(sampling)
+    seed = int(seed)
+
+
 
     geoFile = '{}/input_files/geo_{}.root'.format(args.workDir, fcn_id)
     if not os.path.isfile(geoFile):
@@ -110,8 +135,9 @@ def compute_FCN(params, fcn_id):
         return
 
     chi2s = 0
+    
     try:
-        chi2s = calculate_geofile(geoFile, sampling)
+        chi2s = calculate_geofile(geoFile, sampling, seed)
     except Exception, e:
         log.exception(e)
         cur.execute('UPDATE points_results SET geofile_exception = %s WHERE id = %s', (True, id))
@@ -124,12 +150,15 @@ def compute_FCN(params, fcn_id):
         L, W = map(float, lw_f.read().strip().split(","))
 
     insert_hist(fcn_id, id)
+    insert_geofile(fcn_id, id)
 
     log.info('Processing results...')
     fcn = FCN(W, chi2s, L)
+    #render_geofile(geoFile)
     tlgrm_notify("[{}]\nresampled={}\nid={}\nweight={}\nchi2={}\nmetric={:1.3e}".format(params_json, sampling, fcn_id, W, chi2s, fcn))
+    #tlgrm_image(os.path.splitext(geoFile)[0] + '.png')
 
-    cur.execute('UPDATE points_results SET weight = %s, metric_1 = %s, chi2 = %s, status = %s WHERE id = %s', (W, fcn, chi2s, 'completed', id))
+    cur.execute('UPDATE points_results SET weight = %s, metric_1 = %s, chi2 = %s, status = %s, tag_image = %s, seed = %s WHERE id = %s', (W, fcn, chi2s, 'completed', '20170420', seed, id))
     db.commit()
     db.close()
 
@@ -172,7 +201,10 @@ def fcn_worker(task_queue, lockfile):
             if not params:
                 break
 
-            fcn_id = create_id(params[:-1])
+            params_json = json.dumps(params[:-1])
+            h = md5.new()
+            h.update(params_json)
+            fcn_id = h.hexdigest()
 
             latest_parameters = params[:-1]
 
