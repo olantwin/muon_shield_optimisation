@@ -94,12 +94,23 @@ def main():
     # TODO always pass from steering process?
 
     outFile = "/output/ship.conical.MuonBack-TGeant4.root"
-    generate(args.input, args.geofile, n, outFile, args.lofi, args.seed)
-    chain = r.TChain('cbmsim')
-    chain.Add(outFile)
-    xs = analyse(chain, args.hists)
-    with open(args.results, 'w') as f:
-        f.write("{}\n".format(sum(xs)))
+    try:
+        generate(args.input, args.geofile, n, outFile, args.lofi, args.seed)
+    except:
+        with open(args.results, 'w') as f:
+            f.write("{}\n".format('-1'))
+        return
+
+    try:
+        chain = r.TChain('cbmsim')
+        chain.Add(outFile)
+        xs = analyse(chain, args.hists)
+        with open(args.results, 'w') as f:
+            f.write("{}\n".format(sum(xs)))
+    except:
+        with open(args.results, 'w') as f:
+            f.write("{}\n".format('-2'))
+
     os.remove(outFile)
 
 

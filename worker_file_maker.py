@@ -1,4 +1,4 @@
-#!/bin/env python2
+#!/usr/bin/env python2
 import subprocess
 from multiprocessing import Pool, cpu_count
 import os
