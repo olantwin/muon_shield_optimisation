@@ -72,8 +72,9 @@ def main():
     # files = os.listdir("logs")
     # for f in files:
     #     task_queue.put("logs/"+f)
-    task_queue.put("logs/geo_d91dc7724d0103b53df55bb73603ea7b.root_jobs.json")
-    task_queue.put("logs/geo_1.root_jobs.json")
+    #task_queue.put("logs/geo_b93fdcb746647b91eb9436c0f5b6480f.root_jobs.json")
+    task_queue.put("logs/geo_d920d0ab360af1663ee766a992e710dc.root_jobs.json")
+    #task_queue.put("logs/geo_1.root_jobs.json")
 
     p = Pool(10)
 

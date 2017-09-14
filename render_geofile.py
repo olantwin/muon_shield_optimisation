@@ -1,12 +1,8 @@
 #!/bin/env python2
 import os
 from time import sleep
-import click
 import ROOT as r
 
-
-@click.command()
-@click.argument('geofile')
 def render_geofile(geofile):
     f = r.TFile.Open(geofile, 'read')
     geo = f.FAIRGeom
@@ -21,6 +17,3 @@ def render_geofile(geofile):
     print 2 * muonshield.GetShape().GetDZ()
     f.Close()
 
-
-if __name__ == '__main__':
-    render_geofile()

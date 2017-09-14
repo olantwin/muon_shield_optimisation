@@ -12,11 +12,12 @@ from skopt.learning import RandomForestRegressor
 from skopt.learning import GradientBoostingQuantileRegressor
 from skopt.space.space import Integer, Space
 
-target_points_in_time = 100
+target_points_in_time = 5
 fixed = [
     70.0, 170.0, 40.0, 40.0, 150.0, 150.0, 2.0, 2.0, 80.0, 80.0, 150.0, 150.0,
     2.0, 2.0
 ]
+
 
 
 def add_fixed_params(point):
@@ -106,22 +107,10 @@ def main():
             y_0 = []
             for params, metric in data:
                 new_X = parse_params(params)
-                if is_inspace(new_X):
+                if is_inspace(new_X) and space.__contains__(strip_fixed_params(new_X)):
                     X_0.append(strip_fixed_params(new_X))
                     y_0.append(float(metric))
-
-            opt_rf = Optimizer(
-                space,
-                RandomForestRegressor(
-                    n_estimators=100, max_depth=10, n_jobs=-1),
-                acq_optimizer='sampling')
-            opt_gb = Optimizer(
-                space,
-                GradientBoostingQuantileRegressor(
-                    base_estimator=GradientBoostingRegressor(
-                        n_estimators=100, max_depth=4, loss='quantile')),
-                acq_optimizer='sampling')
-
+        
             print 'Start to tell points.'
             if len(X_0) != 0:
                 opt_rf.tell(X_0, y_0)
@@ -165,8 +154,6 @@ def main():
                         (create_id(points[index]), str(points[index]),
                          optimizers[i]))
             db.commit()
-
-            time.sleep(30 * 60)
 
         except exceptions.KeyboardInterrupt:
             db.close()

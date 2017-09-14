@@ -47,15 +47,15 @@ def continuous_space():
     space = []
     number = 0
     for _ in range(6):
-        space.append({'name': 'var{}'.format(number), 'type': 'continuous', 'domain': (20 + zGap, 300 + zGap)})
+        space.append({'name': 'var{}'.format(number), 'type': 'discrete', 'domain': tuple(range(150 + zGap, 301 + zGap))})
         number += 1
 
     for _ in range(6):
         for __ in range(4):
-            space.append({'name': 'var{}'.format(number), 'type': 'continuous', 'domain': (10, 250)})
+            space.append({'name': 'var{}'.format(number), 'type': 'discrete', 'domain': tuple(range(10, 200 + 1))})
             number += 1
         for __ in range(2):
-            space.append({'name': 'var{}'.format(number), 'type': 'continuous', 'domain': (2, 100)})
+            space.append({'name': 'var{}'.format(number), 'type': 'discrete', 'domain': tuple(range(2, 70))})
             number += 1
 
     return space
@@ -90,12 +90,13 @@ def main():
     while True:
         try:
             cur.execute(
-                '''SELECT params, metric_1 FROM points_results WHERE metric_1 IS NOT NULL AND tag = 'GPyOpt' '''
+                '''SELECT params, metric_1 FROM points_results WHERE metric_1 IS NOT NULL AND tag = 'discrete' '''
             )
             data = cur.fetchall()
 
             X_0 = []
             y_0 = []
+
             for params, metric in data:
                 new_X = parse_params(params)
                 if is_inspace(new_X):
@@ -103,6 +104,15 @@ def main():
                     y_0.append(float(metric))
 
             space = continuous_space()
+            transform_space = GPyOpt.core.task.space.Design_space(space)
+
+            for params, metric in data:
+                new_X = parse_params(params)
+                if is_inspace(new_X) and transform_space.indicator_constraints(strip_fixed_params(new_X)):
+                    X_0.append(strip_fixed_params(new_X))
+                    y_0.append(float(metric))
+
+       
             BO = GPyOpt.methods.BayesianOptimization(f=lambda x: np.sum(x),  
                                             domain = space,                  
                                             acquisition_type = 'EI',              
@@ -124,7 +134,7 @@ def main():
 
             for point in points:
                 cur.execute(
-                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag) VALUES (%s, %s, 'gp', 'Artem', 37, 'waiting', 'GPyOpt') ''',
+                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag) VALUES (%s, %s, 'Gpyopt', 'Artem', 37, 'waiting', 'discrete') ''',
                         (create_id(point), str(point)))
             db.commit()
             time.sleep(30 * 60)

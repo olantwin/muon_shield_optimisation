@@ -18,36 +18,36 @@ import exceptions
 import logging
 import time
 from downloader import create_merged_file
+import random
+from models import Point, Base
+import sqlalchemy
+from sqlalchemy.orm import sessionmaker
 
-DB_CONF = dict(
-    host='2a03:b0c0:1:d0::2c4f:1001',
-    user='root',
-    passwd='P@ssw0rd',
-    db='points_prod'
-)
 
+engine = sqlalchemy.create_engine('mysql://root:P@ssw0rd@[2a03:b0c0:1:d0::2c4f:1001]/points_prod')
+Base.metadata.bind = engine
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
 
 with open("points.json") as f:
     POINTS = json.load(f)
     f.close()
 
+def parse_params(params_string):
+    return [float(x) for x in params_string.strip('[]').split(',')]
 
 def dump_params(path, params_json_str):
     with open(path, "w") as f:
         f.write(params_json_str)
 
-def create_geofile(params):
-    params_json = json.dumps(params)
-    h = md5.new()
-    h.update(params_json)
-    fcn_id = h.hexdigest()
+def create_geofile(point):
 
     geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
-        args.workDir, fcn_id), params)
+        args.workDir, point.id), parse_params(point.params))
 
     log = logging.getLogger('create_geofile')
     try:
-        log.info("Running docker: " + params_json)
+        log.info("Running docker: " + point.params)
         docker.run(
             "--rm",
             "-v", "{}:/shield".format(args.workDir),
@@ -55,7 +55,7 @@ def create_geofile(params):
             '/bin/bash',
             '-l',
             '-c',
-            "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{0}.root -o /shield/input_files/geo_{0}.lw.csv".format(fcn_id)
+            "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{0}.root -o /shield/input_files/geo_{0}.lw.csv".format(point.id)
         )
         log.info("Docker finished!")
         return True
@@ -70,68 +70,52 @@ def geofile_worker(task_queue):
             break
         create_geofile(params)
 
-def insert_hist(fcn_id, id):
-    db = MySQLdb.connect(**DB_CONF)
-    cur = db.cursor()
-
+def insert_hist(point):
     try:
-        create_merged_file('logs/geo_{}.root_jobs.json'.format(fcn_id))
+        create_merged_file('logs/geo_{}.root_jobs.json'.format(point.id))
     except:
         return
 
-    with open('./hists/geo_{}.root'.format(fcn_id)) as file:
-        cur.execute('UPDATE points_results SET hist = %s WHERE id = %s', (file.read(), id))
-        db.commit()
-        file.close()
-    db.close()
-
-def insert_geofile(fcn_id, id):
-    db = MySQLdb.connect(**DB_CONF)
-    cur = db.cursor()
-
-    with open('./files/geo/geo_{}.root'.format(fcn_id)) as file:
-        cur.execute('UPDATE points_results SET geofile = %s WHERE id = %s', (file.read(), id))
-        db.commit()
+    with open('./hists/geo_{}.root'.format(point.id)) as file:
+        point.hist = file.read()
+        session.commit()
         file.close()
 
-    db.close()
+
+def insert_geofile(point):
+    with open('./files/geo/geo_{}.root'.format(point.id)) as file:
+        point.geofile = file.read()
+        session.commit()
+        file.close()
 
 
-def compute_FCN(params, fcn_id):
-    id = params[-1]
 
-    db = MySQLdb.connect(**DB_CONF)
-    cur = db.cursor()
-
-    params_json = json.dumps(params[:-1])
-
+def compute_FCN(point):
     log = logging.getLogger('compute_fcn')
-    log.info("="*5 + "compute_FCN:{}".format(fcn_id) + "="*5)
+    log.info("="*5 + "compute_FCN:{}".format(point.id) + "="*5)
 
     dump_params(
-        '{}/params/{}.json'.format(args.workDir, fcn_id),
-        params_json
+        '{}/params/{}.json'.format(args.workDir, point.id),
+        point.params
     )
-    cur.execute('''UPDATE points_results SET status = 'running' WHERE id = '{}' '''.format(id))
-    db.commit()
 
-    cur.execute('SELECT resampled, seed FROM points_results WHERE id = {}'.format(id))
-    sampling, seed = list(cur.fetchall()[0])
+    point.status = 'running'
+    session.commit()
 
-    if seed is None:
-        seed = np.random.randint(0, 100)
+    sampling = point.resampled
 
-    sampling = int(sampling)
-    seed = int(seed)
-
+    if point.seed is None:
+        seed = 1
+    else:
+        seed = point.seed
 
 
-    geoFile = '{}/input_files/geo_{}.root'.format(args.workDir, fcn_id)
+    geoFile = '{}/input_files/geo_{}.root'.format(args.workDir, point.id)
     if not os.path.isfile(geoFile):
         log.error("Geofile does not exist, exiting!")
-        cur.execute('UPDATE points_results SET geofile_exception = %s WHERE id = %s', (True, id))
-        db.commit()
-        db.close()
+
+        point.geofile_exception = True
+        session.commit()
         return
 
     chi2s = 0
@@ -140,27 +124,30 @@ def compute_FCN(params, fcn_id):
         chi2s = calculate_geofile(geoFile, sampling, seed)
     except Exception, e:
         log.exception(e)
-        cur.execute('UPDATE points_results SET geofile_exception = %s WHERE id = %s', (True, id))
-        db.commit()
-        db.close()
-        tlgrm_notify("Error calculating: [{}]  {}".format(params_json, e))
+        point.geofile_exception = True
+        session.commit()
+        tlgrm_notify("Error calculating: [{}]  {}".format(point.params, e))
         return
 
-    with open(os.path.join(args.workDir, 'input_files/geo_{}.lw.csv'.format(fcn_id))) as lw_f:
+    with open(os.path.join(args.workDir, 'input_files/geo_{}.lw.csv'.format(point.id))) as lw_f:
         L, W = map(float, lw_f.read().strip().split(","))
 
-    insert_hist(fcn_id, id)
-    insert_geofile(fcn_id, id)
+    insert_hist(point)
+    insert_geofile(point)
+
 
     log.info('Processing results...')
     fcn = FCN(W, chi2s, L)
     #render_geofile(geoFile)
-    tlgrm_notify("[{}]\nresampled={}\nid={}\nweight={}\nchi2={}\nmetric={:1.3e}".format(params_json, sampling, fcn_id, W, chi2s, fcn))
+    tlgrm_notify("[{}]\nresampled={}\nid={}\ngeo_id={}\nweight={}\nchi2={}\nmetric={:1.3e}".format(point.params, sampling, point.id, point.geo_id, W, chi2s, fcn))
     #tlgrm_image(os.path.splitext(geoFile)[0] + '.png')
-
-    cur.execute('UPDATE points_results SET weight = %s, metric_1 = %s, chi2 = %s, status = %s, tag_image = %s, seed = %s WHERE id = %s', (W, fcn, chi2s, 'completed', '20170420', seed, id))
-    db.commit()
-    db.close()
+    point.weight = W
+    point.metric_1 = fcn
+    point.chi2 = chi2s
+    point.status = 'completed'
+    point.tag_image = '20170531'
+    point.seed = seed
+    session.commit()
 
     assert np.isclose(
         L / 2.,
@@ -195,35 +182,30 @@ def batch(iterable, n=1):
 
 def fcn_worker(task_queue, lockfile):
     latest_parameters = None
+
     while True:
         try:
-            params = task_queue.get()
-            if not params:
+            the_id = task_queue.get()
+            if not the_id:
                 break
 
-            params_json = json.dumps(params[:-1])
-            h = md5.new()
-            h.update(params_json)
-            fcn_id = h.hexdigest()
-
-            latest_parameters = params[:-1]
+            latest_id = the_id
 
             lock = filelock.FileLock(lockfile)
-            with lock:
-                result = create_geofile(params[:-1])
 
-            compute_FCN(params, fcn_id)
+            point = session.query(Point).filter(Point.id == the_id).first()
+            with lock:
+                result = create_geofile(point)
+
+            compute_FCN(point)
 
         except BaseException, e:
             log = logging.getLogger('fcn_worker')
             log.exception(e)
 
-            db = MySQLdb.connect(**DB_CONF)
-            cur = db.cursor()
 
-            cur.execute('UPDATE points_results SET params_exception = %s WHERE id = %s', (True, params[-1]))
-            db.commit()
-            db.close()
+            point.params_exception = True
+            session.commit()
 
             tlgrm_notify("Exception occured for paramters: [{}]  {}".format(latest_parameters, e))
 
@@ -231,25 +213,6 @@ def fcn_worker(task_queue, lockfile):
 def main():
     logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format = "%(asctime)s %(process)s %(thread)s: %(message)s")
 
-    '''
-    task_queue = Queue()
-    n_workers = 98
-
-    for params in POINTS:
-        task_queue.put(params)
-
-    processes = []
-    for worker_id in xrange(n_workers):
-        task_queue.put(None)
-
-        lockfile = "/tmp/shield-{}.lock".format((worker_id + 1) % 15)
-        p = Process(target=fcn_worker, args=(task_queue, lockfile))
-        p.start()
-        processes.append(p)
-
-    for p in processes:
-        p.join()
-    '''
     n_workers = 98
     processes = []
     try:
@@ -270,8 +233,8 @@ def main():
                     time.sleep(10)
 
             task_queue = Queue()
-            for params in POINTS:
-                task_queue.put(params)
+            for ids in POINTS:
+                task_queue.put(ids)
 
             for worker_id in xrange(n_workers):
                 task_queue.put(None)
@@ -286,19 +249,6 @@ def main():
         for p in processes:
             p.join()
 
-
-
-    # for params_batch in batch(POINTS, 50):
-    #     create_geofiles(params_batch)
-
-    #     processes = []
-    #     for params in params_batch:
-    #         p = Process(target=compute_FCN, args=(params,))
-    #         p.start()
-    #         processes.append(p)
-
-    #     for p in processes:
-    #         p.join()
 
 if __name__ == '__main__':
     r.gErrorIgnoreLevel = r.kWarning
@@ -317,3 +267,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     ntotal = 17786274
     main()
+
