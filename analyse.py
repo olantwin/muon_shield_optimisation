@@ -139,7 +139,7 @@ def analyse(tree, outputfile):
             c = r.TCanvas(name, name, 1600, 900)
             multigraph = r.TMultiGraph(
                 'tracks_{}'.format(i),
-                'Tracks in acceptance and/or on wrong side;z [cm];x/y [cm]')
+                'Tracks in acceptance and side;z [cm];x/y [cm]')
             graph_x.SetLineStyle(1)
             graph_x.SetMarkerStyle(20)
             graph_x.SetTitle('x-projection')
