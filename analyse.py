@@ -158,7 +158,7 @@ def analyse(tree, outputfile):
         classname = h[key].Class().GetName()
         if 'TH' in classname or 'TP' in classname:
             h[key].Write()
-    f.close()
+    f.Close()
     return xs
 
 
