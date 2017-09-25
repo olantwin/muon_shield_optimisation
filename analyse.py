@@ -9,6 +9,10 @@ import rootUtils as ut
 from get_geo import get_geo
 from fcn import FCN
 
+Z_T4 = 3538
+Z_T1 = Z_T4 - 940
+Z_Sensitive_Plane = Z_T4
+
 
 def graph_tracks(event):
     """Create graphs of tracks in event by interpolating between vetoPoints."""
@@ -105,7 +109,11 @@ def analyse(tree, outputfile):
                 if not hit.GetEnergyLoss() > 0:
                     continue
                 pid = hit.PdgCode()
-                if hit.GetZ() > 2597 and hit.GetZ() < 2599 and abs(pid) == 13:
+                if (
+                        hit.GetZ() > (Z_Sensitive_Plane - 1) and
+                        hit.GetZ() < (Z_Sensitive_Plane + 1) and
+                        abs(pid) == 13
+                ):
                     hit.Momentum(mom)
                     P = mom.Mag() / u.GeV
                     y = hit.GetY()
@@ -115,8 +123,11 @@ def analyse(tree, outputfile):
                     else:
                         h['anti-mu_pos'].Fill(x, y)
                     x *= pid / 13.
-                    if (P > 1 and abs(y) < 5 * u.m and
-                            (x < 2.6 * u.m and x > -3 * u.m)):
+                    if (
+                            P > 1 and
+                            abs(y) < 5 * u.m and
+                            (x < 2.6 * u.m and x > -3 * u.m)
+                    ):
                         w = np.sqrt((560. - (x + 300.)) / 560.)
                         xs.push_back(w)
                         h['mu_p'].Fill(P)
