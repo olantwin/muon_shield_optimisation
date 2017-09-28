@@ -21,13 +21,12 @@ from downloader import create_merged_file
 import random
 from models import Point, Base
 import sqlalchemy
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 
 engine = sqlalchemy.create_engine('mysql://root:P@ssw0rd@[2a03:b0c0:1:d0::2c4f:1001]/points_prod')
 Base.metadata.bind = engine
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
+Session = scoped_session(sessionmaker(bind=engine))
 
 with open("points.json") as f:
     POINTS = json.load(f)
@@ -51,7 +50,7 @@ def create_geofile(point):
         docker.run(
             "--rm",
             "-v", "{}:/shield".format(args.workDir),
-            "olantwin/ship-shield:20170420",
+            "olantwin/ship-shield:20170818",
             '/bin/bash',
             '-l',
             '-c',
@@ -70,7 +69,7 @@ def geofile_worker(task_queue):
             break
         create_geofile(params)
 
-def insert_hist(point):
+def insert_hist(point, session):
     try:
         create_merged_file('logs/geo_{}.root_jobs.json'.format(point.id))
     except:
@@ -82,7 +81,7 @@ def insert_hist(point):
         file.close()
 
 
-def insert_geofile(point):
+def insert_geofile(point, session):
     with open('./files/geo/geo_{}.root'.format(point.id)) as file:
         point.geofile = file.read()
         session.commit()
@@ -91,6 +90,9 @@ def insert_geofile(point):
 
 
 def compute_FCN(point):
+    session = Session()
+    point = session.merge(point)
+
     log = logging.getLogger('compute_fcn')
     log.info("="*5 + "compute_FCN:{}".format(point.id) + "="*5)
 
@@ -119,21 +121,47 @@ def compute_FCN(point):
         return
 
     chi2s = 0
-    
+
+    session.close()
+
+    with open(os.path.join(args.workDir, 'input_files/geo_{}.lw.csv'.format(point.id))) as lw_f:
+        L, W = map(float, lw_f.read().strip().split(","))
+
+    if W > 3e+6:
+        session = Session()
+        point = session.merge(point)
+
+        log.info('Processing results...')
+
+        #render_geofile(geoFile)
+        tlgrm_notify("[{}]\nresampled={}\nid={}\ngeo_id={}\nweight={}\n".format(point.params, sampling, point.id, point.geo_id, W))
+        #tlgrm_image(os.path.splitext(geoFile)[0] + '.png')
+        point.weight = W
+        point.metric_2 = 1e+8
+        point.status = 'completed'
+        point.tag_image = '20170831'
+        session.commit()
+        session.close()
+        return
+        
+
+
     try:
         chi2s = calculate_geofile(geoFile, sampling, seed)
     except Exception, e:
         log.exception(e)
-        point.geofile_exception = True
-        session.commit()
         tlgrm_notify("Error calculating: [{}]  {}".format(point.params, e))
         return
 
     with open(os.path.join(args.workDir, 'input_files/geo_{}.lw.csv'.format(point.id))) as lw_f:
         L, W = map(float, lw_f.read().strip().split(","))
 
-    insert_hist(point)
-    insert_geofile(point)
+    
+    session = Session()
+    point = session.merge(point)
+
+    insert_hist(point, session)
+    insert_geofile(point, session)
 
 
     log.info('Processing results...')
@@ -142,19 +170,19 @@ def compute_FCN(point):
     tlgrm_notify("[{}]\nresampled={}\nid={}\ngeo_id={}\nweight={}\nchi2={}\nmetric={:1.3e}".format(point.params, sampling, point.id, point.geo_id, W, chi2s, fcn))
     #tlgrm_image(os.path.splitext(geoFile)[0] + '.png')
     point.weight = W
-    point.metric_1 = fcn
+    point.metric_2 = fcn
     point.chi2 = chi2s
     point.status = 'completed'
-    point.tag_image = '20170531'
+    point.tag_image = '20170818'
     point.seed = seed
     session.commit()
 
     assert np.isclose(
         L / 2.,
-        sum(params[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
+        sum(parse_params(point.params)[:8]) + 5), 'Analytical and ROOT lengths are not the same.'
 
     log.info("="*5 + "/compute_FCN" + "="*5)
-
+    session.close()
 
 def batch(iterable, n=1):
     l = len(iterable)
@@ -182,11 +210,13 @@ def batch(iterable, n=1):
 
 def fcn_worker(task_queue, lockfile):
     latest_parameters = None
+    session = Session()
 
     while True:
         try:
             the_id = task_queue.get()
             if not the_id:
+                session.close()
                 break
 
             latest_id = the_id
@@ -206,6 +236,7 @@ def fcn_worker(task_queue, lockfile):
 
             point.params_exception = True
             session.commit()
+            session.close()
 
             tlgrm_notify("Exception occured for paramters: [{}]  {}".format(latest_parameters, e))
 
@@ -267,4 +298,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     ntotal = 17786274
     main()
+
 

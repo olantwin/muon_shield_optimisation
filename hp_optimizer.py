@@ -12,7 +12,7 @@ from skopt.learning import RandomForestRegressor
 from skopt.learning import GradientBoostingQuantileRegressor
 from skopt.space.space import Integer, Space
 
-target_points_in_time = 5
+target_points_in_time = 10
 fixed = [
     70.0, 170.0, 40.0, 40.0, 150.0, 150.0, 2.0, 2.0, 80.0, 80.0, 150.0, 150.0,
     2.0, 2.0
@@ -99,19 +99,29 @@ def main():
     while True:
         try:
             cur.execute(
-                '''SELECT params, metric_1 FROM points_results WHERE metric_1 IS NOT NULL AND tag = 'discrete' '''
+                '''SELECT params, metric_2, id FROM points_results WHERE metric_2 IS NOT NULL AND tag = 'discrete' '''
             )
             data = cur.fetchall()
 
             X_0 = []
             y_0 = []
-            for params, metric in data:
+            ids = []
+            for params, metric, id in data:
                 new_X = parse_params(params)
                 if is_inspace(new_X) and space.__contains__(strip_fixed_params(new_X)):
                     X_0.append(strip_fixed_params(new_X))
                     y_0.append(float(metric))
-        
+                    ids.append(id)
+
+            if len(y_0) == 0:
+                min_index = -1
+            else:
+                min_index = ids[np.argmin(y_0)]
+
+            opt_rf = Optimizer(space, RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1))
+            opt_gb = Optimizer(space, GradientBoostingQuantileRegressor(base_estimator=GradientBoostingRegressor(n_estimators=100, max_depth=4, loss='quantile')))
             print 'Start to tell points.'
+            print len(X_0)
             if len(X_0) != 0:
                 opt_rf.tell(X_0, y_0)
                 opt_gb.tell(X_0, y_0)
@@ -128,8 +138,8 @@ def main():
                         alpha *= 10
             else:
                 opt_gp = Optimizer(space,
-                                   GaussianProcessRegressor(
-                                       alpha=1e-7, normalize_y=True, noise='gaussian'))
+                                    GaussianProcessRegressor(
+                                           alpha=1e-7, normalize_y=True, noise='gaussian'))
 
             optimizers = ['rf', 'gb', 'gp']
 
@@ -137,23 +147,35 @@ def main():
 
             print 'Start to ask for points.'
             batch_size = (target_points_in_time) / fraction * fraction
-            points = opt_rf.ask(n_points=batch_size / fraction) + opt_gb.ask(
-                n_points=batch_size / fraction) + opt_gp.ask(
-                    n_points=batch_size / fraction)
+            points = opt_rf.ask(n_points=batch_size / fraction, strategy='cl_mean') + opt_gb.ask(
+                n_points=batch_size / fraction, strategy='cl_mean') + opt_gp.ask(
+                    n_points=batch_size / fraction, strategy='cl_mean')
 
-            points += space.rvs(n_samples=30)
+            #params_rect = [70, 170, 205, 205, 280, 245, 305, 240, 40, 40, 150, 150, 2, 2, 80, 80, 150, 150, 2, 2, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10]
 
             # modify points
             points = [add_fixed_params(p) for p in points]
+        
+            #points.append(params_rect)
 
             for i in range(fraction):
                 for j in range(batch_size / fraction):
                     index = i * (batch_size / fraction) + j
                     cur.execute(
-                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', 'discrete') ''',
+                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag, min_id) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', 'discrete', %s) ''',
                         (create_id(points[index]), str(points[index]),
-                         optimizers[i]))
+                         optimizers[i], min_index))
+
+            '''
+            for i in range(30):
+                index = batch_size + i
+                cur.execute(
+                        "INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag) VALUES (%s, %s, 'random', 'Artem', 37, 'waiting', 'discrete')",
+                        (create_id(points[index]), str(points[index])))
+            '''
             db.commit()
+
+            time.sleep(5 * 60)
 
         except exceptions.KeyboardInterrupt:
             db.close()

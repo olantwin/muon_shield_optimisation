@@ -23,7 +23,7 @@ JOB_TEMPLATE = {
 
         "container" : {
             "workdir" : "",
-            "name" : "olantwin/ship-shield:20170531",
+            "name" : "olantwin/ship-shield:20170818",
             "volumes": ["/home/sashab1/ship-shield:/shield"],
             "cpu_needed" : 1,
             "max_memoryMB" : 1024,
