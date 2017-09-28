@@ -59,10 +59,12 @@ def discrete_space():
     dZgap = 10
     zGap = dZgap / 2  # halflengh of gap
     return Space(6 * [
-        Integer(150 + zGap, 300 + zGap)  # magnet lengths
+        Integer(170 + zGap, 300 + zGap)  # magnet lengths
     ] + 6 * (
-        4 * [
-            Integer(10, 200)  # dXIn, dXOut, dYIn, dYOut
+        2 * [
+            Integer(10, 100)  # dXIn, dXOut
+        ] + 2 * [
+            Integer(20, 200)  # dYIn, dYOut
         ] + 2 * [
             Integer(2, 70)  # gapIn, gapOut
         ]))
