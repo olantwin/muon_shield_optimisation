@@ -101,7 +101,7 @@ def main():
     while True:
         try:
             cur.execute(
-                '''SELECT params, metric_2, id FROM points_results WHERE metric_2 IS NOT NULL AND tag = 'discrete' '''
+                '''SELECT params, metric_2, id FROM points_results WHERE metric_2 IS NOT NULL AND tag = 'discrete2_gb' '''
             )
             data = cur.fetchall()
 
@@ -120,38 +120,16 @@ def main():
             else:
                 min_index = ids[np.argmin(y_0)]
 
-            opt_rf = Optimizer(space, RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1))
             opt_gb = Optimizer(space, GradientBoostingQuantileRegressor(base_estimator=GradientBoostingRegressor(n_estimators=100, max_depth=4, loss='quantile')))
-            print 'Start to tell points.'
-            print len(X_0)
-            if len(X_0) != 0:
-                opt_rf.tell(X_0, y_0)
-                opt_gb.tell(X_0, y_0)
 
-                alpha = 1e-7
-                while True:
-                    try:
-                        opt_gp = Optimizer(space,
-                                           GaussianProcessRegressor(
-                                               alpha=alpha, normalize_y=True, noise='gaussian'))
-                        opt_gp.tell(X_0, y_0)
-                        break
-                    except BaseException:
-                        alpha *= 10
-            else:
-                opt_gp = Optimizer(space,
-                                    GaussianProcessRegressor(
-                                           alpha=1e-7, normalize_y=True, noise='gaussian'))
-
-            optimizers = ['rf', 'gb', 'gp']
+            optimizers = ['gb']
 
             fraction = len(optimizers)
 
             print 'Start to ask for points.'
             batch_size = (target_points_in_time) / fraction * fraction
-            points = opt_rf.ask(n_points=batch_size / fraction, strategy='cl_mean') + opt_gb.ask(
-                n_points=batch_size / fraction, strategy='cl_mean') + opt_gp.ask(
-                    n_points=batch_size / fraction, strategy='cl_mean')
+            points =  opt_gb.ask(
+                n_points=batch_size / fraction, strategy='cl_mean')
 
             #params_rect = [70, 170, 205, 205, 280, 245, 305, 240, 40, 40, 150, 150, 2, 2, 80, 80, 150, 150, 2, 2, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10]
 
@@ -164,7 +142,7 @@ def main():
                 for j in range(batch_size / fraction):
                     index = i * (batch_size / fraction) + j
                     cur.execute(
-                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag, min_id) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', 'discrete', %s) ''',
+                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag, min_id) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', 'discrete2_gb', %s) ''',
                         (create_id(points[index]), str(points[index]),
                          optimizers[i], min_index))
 
