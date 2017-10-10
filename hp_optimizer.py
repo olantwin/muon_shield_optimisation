@@ -3,9 +3,9 @@ import exceptions
 import time
 import md5
 import json
+import argparse
 import MySQLdb
 import numpy as np
-import argparse
 from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
 from skopt.learning import GaussianProcessRegressor
@@ -27,7 +27,6 @@ def add_fixed_params(point):
 
 def strip_fixed_params(point):
     return point[2:8] + point[20:]
-
 
 
 def create_id(params):
@@ -57,14 +56,15 @@ def process_points(data, space):
     X_0 = []
     y_0 = []
     ids = []
-    for params, metric, id in data:
+    for params, metric, _id in data:
         new_X = parse_params(params)
         if space.__contains__(strip_fixed_params(new_X)):
             X_0.append(strip_fixed_params(new_X))
             y_0.append(float(metric))
-            ids.append(id)
+            ids.append(_id)
 
     return X_0, y_0, ids
+
 
 def parse_params(params_string):
     return [float(x) for x in params_string.strip('[]').split(',')]
@@ -89,19 +89,40 @@ def main():
     tag = "discrete2_{opt}".format(opt=clf_type)
 
     if clf_type == 'rf':
-        clf = Optimizer(space, RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1))
+        clf = Optimizer(
+            space,
+            RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
+        )
     elif clf_type == 'gb':
-        clf = Optimizer(space, GradientBoostingQuantileRegressor(base_estimator=\
-                            GradientBoostingRegressor(n_estimators=100, max_depth=4, loss='quantile')))
+        clf = Optimizer(
+            space,
+            GradientBoostingQuantileRegressor(
+                base_estimator=GradientBoostingRegressor(
+                    n_estimators=100,
+                    max_depth=4,
+                    loss='quantile'
+                )
+            )
+        )
     elif clf_type == 'gp':
-        clf = Optimizer(space, GaussianProcessRegressor(
-                                           alpha=1e-7, normalize_y=True, noise='gaussian'))
+        clf = Optimizer(
+            space,
+            GaussianProcessRegressor(
+                alpha=1e-7,
+                normalize_y=True,
+                noise='gaussian'
+            )
+        )
+
 
 
     while True:
         try:
             cur.execute(
-                '''SELECT params, metric_2, id FROM points_results WHERE metric_2 IS NOT NULL AND tag = '{}' '''.format(tag)
+                '''SELECT params, metric_2, id '''
+                '''FROM points_results '''
+                '''WHERE metric_2 IS NOT NULL '''
+                '''AND tag = '{}' '''.format(tag)
             )
             data = cur.fetchall()
             X_0, y_0, ids = process_points(data, space)
@@ -115,15 +136,22 @@ def main():
                 clf.tell(X_0, y_0)
 
             print 'Start to ask for points.'
-            points = clf.ask(n_points=target_points_in_time, strategy='cl_mean')
+            points = clf.ask(
+                n_points=target_points_in_time,
+                strategy='cl_mean'
+            )
 
             points = [add_fixed_params(p) for p in points]
 
             for j in range(target_points_in_time):
                 cur.execute(
-                    '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag, min_id) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', %s, %s) ''',
+                    '''INSERT INTO points_results '''
+                    '''(geo_id, params, optimizer, author, '''
+                    '''resampled, status, tag, min_id) '''
+                    '''VALUES (%s, %s, %s, 'Artem', 37, 'waiting', %s, %s) ''',
                     (create_id(points[j]), str(points[j]),
-                     clf_type, tag, min_index))
+                     clf_type, tag, min_index)
+                )
 
             db.commit()
 
