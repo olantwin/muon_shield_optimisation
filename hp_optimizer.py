@@ -5,6 +5,7 @@ import md5
 import json
 import MySQLdb
 import numpy as np
+import argparse
 from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
 from skopt.learning import GaussianProcessRegressor
@@ -28,15 +29,6 @@ def strip_fixed_params(point):
     return point[2:8] + point[20:]
 
 
-def compute_fixed_params():
-    fixed_params = []
-    for i in range(2):
-        fixed_params.append((fixed[i], i))
-    for i in range(8, 20):
-        fixed_params.append((fixed[i - 6], i))
-
-    return fixed_params
-
 
 def create_id(params):
     params_json = json.dumps(params)
@@ -44,15 +36,6 @@ def create_id(params):
     h.update(params_json)
     fcn_id = h.hexdigest()
     return fcn_id
-
-
-def compute_space(X_0):
-    space = []
-    df = np.array(X_0)
-    for i in range(0, len(X_0[0])):
-        space.append((np.min(df[:, i]), np.max(df[:, i])))
-
-    return space
 
 
 def discrete_space():
@@ -70,17 +53,18 @@ def discrete_space():
         ]))
 
 
-def is_inspace(x):
-    fixed_params = compute_fixed_params()
-    for param, position in fixed_params:
-        if x[position] != param:
-            return False
-    for param in x:
-        if param < 0:
-            return False
+def process_points(data, space):
+    X_0 = []
+    y_0 = []
+    ids = []
+    for params, metric, id in data:
+        new_X = parse_params(params)
+        if space.__contains__(strip_fixed_params(new_X)):
+            X_0.append(strip_fixed_params(new_X))
+            y_0.append(float(metric))
+            ids.append(id)
 
-    return True
-
+    return X_0, y_0, ids
 
 def parse_params(params_string):
     return [float(x) for x in params_string.strip('[]').split(',')]
@@ -94,87 +78,53 @@ DB_CONF = dict(
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Start optimizer.')
+    parser.add_argument('-opt', help='Write an optimizer.')
+
     db = MySQLdb.connect(**DB_CONF)
     cur = db.cursor()
     space = discrete_space()
 
+    clf_type = parser.parse_args().opt
+    tag = "discrete2_{opt}".format(opt=clf_type)
+
+    if clf_type == 'rf':
+        clf = Optimizer(space, RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1))
+    elif clf_type == 'gb':
+        clf = Optimizer(space, GradientBoostingQuantileRegressor(base_estimator=\
+                            GradientBoostingRegressor(n_estimators=100, max_depth=4, loss='quantile')))
+    elif clf_type == 'gp':
+        clf = Optimizer(space, GaussianProcessRegressor(
+                                           alpha=1e-7, normalize_y=True, noise='gaussian'))
+
+
     while True:
         try:
             cur.execute(
-                '''SELECT params, metric_2, id FROM points_results WHERE metric_2 IS NOT NULL AND tag = 'discrete' '''
+                '''SELECT params, metric_2, id FROM points_results WHERE metric_2 IS NOT NULL AND tag = '{}' '''.format(tag)
             )
             data = cur.fetchall()
-
-            X_0 = []
-            y_0 = []
-            ids = []
-            for params, metric, id in data:
-                new_X = parse_params(params)
-                if is_inspace(new_X) and space.__contains__(strip_fixed_params(new_X)):
-                    X_0.append(strip_fixed_params(new_X))
-                    y_0.append(float(metric))
-                    ids.append(id)
+            X_0, y_0, ids = process_points(data, space)
 
             if len(y_0) == 0:
                 min_index = -1
             else:
                 min_index = ids[np.argmin(y_0)]
 
-            opt_rf = Optimizer(space, RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1))
-            opt_gb = Optimizer(space, GradientBoostingQuantileRegressor(base_estimator=GradientBoostingRegressor(n_estimators=100, max_depth=4, loss='quantile')))
-            print 'Start to tell points.'
-            print len(X_0)
             if len(X_0) != 0:
-                opt_rf.tell(X_0, y_0)
-                opt_gb.tell(X_0, y_0)
-
-                alpha = 1e-7
-                while True:
-                    try:
-                        opt_gp = Optimizer(space,
-                                           GaussianProcessRegressor(
-                                               alpha=alpha, normalize_y=True, noise='gaussian'))
-                        opt_gp.tell(X_0, y_0)
-                        break
-                    except BaseException:
-                        alpha *= 10
-            else:
-                opt_gp = Optimizer(space,
-                                    GaussianProcessRegressor(
-                                           alpha=1e-7, normalize_y=True, noise='gaussian'))
-
-            optimizers = ['rf', 'gb', 'gp']
-
-            fraction = len(optimizers)
+                clf.tell(X_0, y_0)
 
             print 'Start to ask for points.'
-            batch_size = (target_points_in_time) / fraction * fraction
-            points = opt_rf.ask(n_points=batch_size / fraction, strategy='cl_mean') + opt_gb.ask(
-                n_points=batch_size / fraction, strategy='cl_mean') + opt_gp.ask(
-                    n_points=batch_size / fraction, strategy='cl_mean')
+            points = clf.ask(n_points=target_points_in_time, strategy='cl_mean')
 
-            #params_rect = [70, 170, 205, 205, 280, 245, 305, 240, 40, 40, 150, 150, 2, 2, 80, 80, 150, 150, 2, 2, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10, 35, 35, 35, 35, 10, 10]
-
-            # modify points
             points = [add_fixed_params(p) for p in points]
-        
-            #points.append(params_rect)
 
-            for i in range(fraction):
-                for j in range(batch_size / fraction):
-                    index = i * (batch_size / fraction) + j
-                    cur.execute(
-                        '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag, min_id) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', 'discrete', %s) ''',
-                        (create_id(points[index]), str(points[index]),
-                         optimizers[i], min_index))
-
-            '''
-            for i in range(30):
-                index = batch_size + i
+            for j in range(target_points_in_time):
                 cur.execute(
-                        "INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag) VALUES (%s, %s, 'random', 'Artem', 37, 'waiting', 'discrete')",
-                        (create_id(points[index]), str(points[index])))
-            '''
+                    '''INSERT INTO points_results (geo_id, params, optimizer, author, resampled, status, tag, min_id) VALUES (%s, %s, %s, 'Artem', 37, 'waiting', %s, %s) ''',
+                    (create_id(points[j]), str(points[j]),
+                     clf_type, tag, min_index))
+
             db.commit()
 
             time.sleep(10 * 60)
