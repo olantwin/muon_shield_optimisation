@@ -20,6 +20,17 @@ fixed = [
 ]
 
 
+class Dummy_Optimizer(object):
+
+    def __init__(self, dimensions):
+        self.space = Space(dimensions)
+
+    def tell(self, x, y, fit=True):
+        pass
+
+    def ask(self, n_points=None, strategy='cl_min'):
+        return self.space.rvs(n_samples=n_points)
+
 
 def add_fixed_params(point):
     return fixed[:2] + point[:6] + fixed[2:] + point[6:]
@@ -113,8 +124,8 @@ def main():
                 noise='gaussian'
             )
         )
-
-
+    elif clf_type == 'random':
+        clf = Dummy_Optimizer(space)
 
     while True:
         try:
