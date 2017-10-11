@@ -3,7 +3,6 @@ import exceptions
 import time
 import md5
 import json
-import argparse
 import MySQLdb
 import numpy as np
 import argparse
