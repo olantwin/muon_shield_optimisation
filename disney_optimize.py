@@ -2,7 +2,7 @@ import numpy as np
 import time
 import argparse
 
-import common
+import disney_common as common
 
 from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
