@@ -35,7 +35,7 @@ def ProcessJobs(jobs, space, tag):
     y = []
 
     for job in jobs:
-        if job.kind == tag and job.status == disneylandClient.disneyland_pb2.Job.COMPLETED:
+        if job.metadata == tag and job.status == disneylandClient.disneyland_pb2.Job.COMPLETED:
             params = common.StripFixedParams(ParseParams(job.input))
             if space.__contains__(params):
                 X.append(params)
