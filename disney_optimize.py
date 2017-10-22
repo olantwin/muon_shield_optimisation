@@ -13,7 +13,7 @@ import grpc
 import disneylandClient.disneyland_pb2
 from disneylandClient.disneyland_pb2 import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
 
-SLEEP_TIME = 5 # seconds
+SLEEP_TIME = 5  # seconds
 POINTS_IN_BATCH = 100
 FIXED_PARAMS = [
     70.0, 170.0, 40.0, 40.0, 150.0, 150.0, 2.0,
@@ -24,9 +24,11 @@ FIXED_PARAMS = [
 def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
-        jobs_completed = [stub.GetJob(RequestWithId(id=x.id)).status in STATUS_FINAL for x in jobs]
+        jobs_completed = [stub.GetJob(RequestWithId(
+            id=x.id)).status in STATUS_FINAL for x in jobs]
         if all(jobs_completed):
             break
+
 
 def ProcessJobs(jobs, space, tag):
     X = []
@@ -51,7 +53,8 @@ STATUS_FINAL = set([
     disneylandClient.disneyland_pb2.Job.FAILED,
 ])
 
-config_dict = disneylandClient.initClientConfig("/Users/sashab1/.disney/config.yml")
+config_dict = disneylandClient.initClientConfig(
+    "/Users/sashab1/.disney/config.yml")
 creds = disneylandClient.getCredentials()
 channel = grpc.secure_channel(config_dict.get("connect_to"), creds)
 stub = DisneylandStub(channel)
@@ -62,7 +65,6 @@ def main():
     parser.add_argument('-opt', help='Write an optimizer.')
     clf_type = parser.parse_args().opt
     tag = "discrete2_{opt}".format(opt=clf_type)
-
 
     space = common.CreateDiscreteSpace()
     if clf_type == 'rf':
@@ -77,19 +79,29 @@ def main():
 
     while True:
         points = clf.ask(
-                n_points=POINTS_IN_BATCH,
-                strategy='cl_mean')
+            n_points=POINTS_IN_BATCH,
+            strategy='cl_mean')
 
         points = [common.AddFixedParams(p) for p in points]
 
-        jobs = []
+        docker_jobs = []
         for point in points:
-            jobs.append(stub.CreateJob(Job(input=str(point)), kind=tag))
+            docker_jobs.append(stub.CreateJob(
+                Job(input=str(point), kind='docker-job', metadata=tag)))
 
-        WaitCompleteness(jobs)
-        X_new, y_new = ProcessJobs(jobs, space, tag)
+        WaitCompleteness(docker_jobs)
+
+        shield_jobs = []
+        for job in docker_jobs:
+            if job.status == disneylandClient.disneyland_pb2.Job.COMPLETED:
+                # not sure about that line
+                shield_jobs.append(stub.CreateJob(Job(input=job.output,
+                                                      kind='shield-configuration',
+                                                      metadata=tag)))
+
+        WaitCompleteness(shield_jobs)
+        X_new, y_new = ProcessJobs(shield_jobs, space, tag)
         clf.tell(X_new, y_new)
-
 
 
 if __name__ == '__main__':
