@@ -1,8 +1,12 @@
 from numpy import isclose
-from common import generate_geo, get_random_vector, in_bounds
+from common import generate_geo
 from get_geo import get_geo
 from reconstruct_vector import reconstruct_vector
 from rootpy.io import root_open
+from disney_common import AddFixedParams, CreateDiscreteSpace
+
+
+space = CreateDiscreteSpace()
 
 
 def geo_closure(tmpdir, params):
@@ -43,20 +47,6 @@ def test_geo_closure(tmpdir):
         240. + 5.,
         300. + 5.,
         235. + 5.,
-        # MagnAbsorb1:
-        40.,
-        40.,
-        150.,
-        150.,
-        2.,
-        2.,
-        # MagnAbsorb2:
-        80.,
-        80.,
-        150.,
-        150.,
-        2.,
-        2.,
         # Magn1:
         87.,
         65.,
@@ -100,12 +90,11 @@ def test_geo_closure(tmpdir):
         2.,
         55.,
     ]
-    in_bounds(start)
-    params = [70., 170.] + start  # Add constant parameters
+    params = AddFixedParams(start)
     geo_closure(tmpdir, params)
 
 
 def test_random_geo_closure(tmpdir):
     # create vector (use random config)
-    params = [70., 170.] + get_random_vector()  # Add constant parameters
+    params = AddFixedParams(map(float, space.rvs()[0]))
     geo_closure(tmpdir, params)
