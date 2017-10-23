@@ -84,18 +84,10 @@ def main():
 
         points = [common.AddFixedParams(p) for p in points]
 
-        docker_jobs = []
-        for point in points:
-            docker_jobs.append(stub.CreateJob(
-                Job(input=str(point), kind='docker-job', metadata=tag)))
-
-        WaitCompleteness(docker_jobs)
 
         shield_jobs = []
-        for job in docker_jobs:
-            if job.status == disneylandClient.disneyland_pb2.Job.COMPLETED:
-                # not sure about that line
-                shield_jobs.append(stub.CreateJob(Job(input=job.output,
+        for point in points:
+            shield_jobs.append(stub.CreateJob(Job(input=str(point),
                                                       kind='shield-configuration',
                                                       metadata=tag)))
 
