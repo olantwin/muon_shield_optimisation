@@ -106,7 +106,7 @@ def main():
         chain.Add(outFile)
         xs = analyse(chain, args.hists)
         with open(args.results, 'w') as f:
-            f.write("{}\n".format(sum(xs)))
+            f.write("{}\n".format(sum(xs))) # TODO add number of muons, i.e. len(xs)
     except:
         with open(args.results, 'w') as f:
             f.write("{}\n".format('-2'))

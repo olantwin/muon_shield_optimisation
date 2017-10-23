@@ -1,4 +1,3 @@
-import numpy as np
 import time
 import argparse
 
@@ -7,7 +6,6 @@ import disney_common as common
 from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
 from skopt.learning import GaussianProcessRegressor, RandomForestRegressor, GradientBoostingQuantileRegressor
-from skopt.space.space import Integer, Space
 
 import grpc
 import disneylandClient.disneyland_pb2
@@ -15,10 +13,6 @@ from disneylandClient.disneyland_pb2 import Job, RequestWithId, ListOfJobs, List
 
 SLEEP_TIME = 5  # seconds
 POINTS_IN_BATCH = 100
-FIXED_PARAMS = [
-    70.0, 170.0, 40.0, 40.0, 150.0, 150.0, 2.0,
-    2.0, 80.0, 80.0, 150.0, 150.0, 2.0, 2.0
-]
 
 
 def WaitCompleteness(jobs):
@@ -36,7 +30,7 @@ def ProcessJobs(jobs, space, tag):
 
     for job in jobs:
         if job.metadata == tag and job.status == disneylandClient.disneyland_pb2.Job.COMPLETED:
-            params = common.StripFixedParams(ParseParams(job.input))
+            params = common.StripFixedParams(common.ParseParams(job.input))
             if space.__contains__(params):
                 X.append(params)
                 y.append(float(job.output))
@@ -84,12 +78,11 @@ def main():
 
         points = [common.AddFixedParams(p) for p in points]
 
-
         shield_jobs = []
         for point in points:
             shield_jobs.append(stub.CreateJob(Job(input=str(point),
-                                                      kind='shield-configuration',
-                                                      metadata=tag)))
+                                                  kind='shield-configuration',
+                                                  metadata=tag)))
 
         WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
