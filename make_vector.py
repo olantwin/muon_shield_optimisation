@@ -1,5 +1,6 @@
 #!/bin/env python2
 import click
+from disney_common import ParseParams
 from common import generate_geo
 
 
@@ -7,7 +8,7 @@ from common import generate_geo
 @click.argument('geofile')
 @click.argument('unparsed_params')
 def make_vector(geofile, unparsed_params):
-    params = map(float, unparsed_params.strip('[]').split(','))
+    params = ParseParams(unparsed_params)
     print geofile, params
     generate_geo(geofile, params)
 
