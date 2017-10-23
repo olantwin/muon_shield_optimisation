@@ -5,6 +5,7 @@ import json
 from multiprocessing import Queue, Process
 import logging
 import filelock
+from sh import docker
 from skysteer import calculate_geofile
 import grpc
 from fcn import FCN

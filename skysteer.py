@@ -1,12 +1,11 @@
 import json
 import os
-from sh import xrdfs, kinit
-from libscheduler import Metascheduler
 from time import sleep, time
+import logging
 import copy
 import traceback
+from libscheduler import Metascheduler
 from sh import pscp
-import logging
 import config
 
 
@@ -19,13 +18,13 @@ JOB_TEMPLATE = {
     "descriptor": {
         "input": [],
 
-        "container" : {
-            "workdir" : "",
+        "container": {
+            "workdir": "",
             "name": "{}:{}".format(config.IMAGE, config.IMAGE_TAG),
             "volumes": ["/home/sashab1/ship-shield:/shield"],
-            "cpu_needed" : 1,
-            "max_memoryMB" : 1024,
-            "min_memoryMB" : 512,
+            "cpu_needed": 1,
+            "max_memoryMB": 1024,
+            "min_memoryMB": 512,
             "run_id": "near_run3",
             "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/sampling_{sampling}/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root --seed {seed}'",
         },
@@ -99,10 +98,11 @@ def wait_jobs(jobs):
 
                     if not is_failed_due_to_docker(job):
                         job_metadata[job.job_id]['resubmits'] += 1
-                except: pass
+                except:
+                    pass
 
             timeout_passed = time() - wait_started > 10 * 60 * 60.
-            too_many_resubmits = all([v['resubmits'] > 5 for k,v in job_metadata.items()])
+            too_many_resubmits = all([v['resubmits'] > 5 for _, v in job_metadata.items()])
             if completed == 0 and (timeout_passed or too_many_resubmits):
                 if timeout_passed:
                     raise Exception("More than 2 hours passed and no jobs completed.")
@@ -119,7 +119,6 @@ def get_result(jobs):
     for job in jobs:
         if job.status != "completed":
             raise Exception("Incomplete job while calculating result: {}".format(job.job_id))
-            continue
 
         var = filter(lambda o: o.startswith("variable"), job.output)[0]
         result = float(var.split(":", 1)[1].split("=", 1)[1])
@@ -161,6 +160,7 @@ def calculate_geofile(geofile, sampling, seed):
 def main():
     logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format="%(asctime)s %(process)s %(thread)s: %(message)s")
     logging.info("The result for geo_1 is: {}".format(calculate_geofile("geo_1.root")))
+
 
 if __name__ == '__main__':
     main()
