@@ -1,27 +1,33 @@
 #!/usr/bin/env python2
+import os
 import time
-import filelock
-import ROOT as r
-from skysteer import calculate_geofile
 import json
-import grpc
 from multiprocessing import Queue, Process
-from fcn import FCN
-import exceptions
 import logging
+import filelock
+from skysteer import calculate_geofile
+import grpc
+from fcn import FCN
 import disneylandClient.disneyland_pb2
 from disneylandClient.disneyland_pb2 import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
 import disney_common as common
+from common import generate_geo
+import config
 
 SLEEP_TIME = 5 * 60  # seconds
 WORK_DIR = 'root://eoslhcb.cern.ch/'
-    '/eos/ship/user/olantwin/skygrid'
+'/eos/ship/user/olantwin/skygrid'
 CONFIG_PATH = "/Users/sashab1/.disney/config.yml"
 
 config_dict = disneylandClient.initClientConfig(CONFIG_PATH)
 creds = disneylandClient.getCredentials()
 channel = grpc.secure_channel(config_dict.get("connect_to"), creds)
 stub = DisneylandStub(channel)
+
+
+def dump_params(path, params_json_str):
+    with open(path, "w") as f:
+        f.write(params_json_str)
 
 
 def compute_FCN(job):
@@ -45,7 +51,7 @@ def compute_FCN(job):
 
     result = {'weight': weight, 'length': length, 'metric': 1e+8, 'chi2s': -1}
 
-    if W < 3e+6:
+    if weight < 3e+6:
         try:
             chi2s = calculate_geofile(geoFile, sampling=37, seed=1)
         except Exception, e:
@@ -58,11 +64,11 @@ def compute_FCN(job):
         result['metric'] = metric
         result['chi2s'] = chi2s
 
-    job.output = json.dump(result)
+    job.output = json.dumps(result)
     job.status = disneylandClient.disneyland_pb2.Job.COMPLETED
     stub.ModifyJob(job)
 
-    log.info("Job completed: {}".format(job.id))
+    log.info("Job completed: %s", job.id)
 
 
 def fcn_worker(task_queue, lockfile):
@@ -88,7 +94,7 @@ def create_geofile(job):
         docker.run(
             "--rm",
             "-v", "{}:/shield".format(WORK_DIR),
-            "olantwin/ship-shield:20170818",
+            "{}:{}".format(config.IMAGE, config.IMAGE_TAG),
             '/bin/bash',
             '-l',
             '-c',
@@ -99,14 +105,18 @@ def create_geofile(job):
         return True
     except Exception, e:
         log.exception(
-            'Docker finished with error, hope it is fine! {}'.format(e))
+            'Docker finished with error, hope it is fine! %s',
+            e
+        )
         return False
 
 
 def main():
-    logging.basicConfig(filename='./logs/runtime.log',
-                        level=logging.INFO,
-                        format="%(asctime)s %(process)s %(thread)s: %(message)s")
+    logging.basicConfig(
+        filename='./logs/runtime.log',
+        level=logging.INFO,
+        format="%(asctime)s %(process)s %(thread)s: %(message)s"
+    )
     n_workers = 98
     processes = []
 
@@ -126,6 +136,7 @@ def main():
             processes.append(p)
 
         time.sleep(SLEEP_TIME)
+
 
 if __name__ == '__main__':
     main()

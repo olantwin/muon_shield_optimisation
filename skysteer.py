@@ -7,6 +7,7 @@ import copy
 import traceback
 from sh import pscp
 import logging
+import config
 
 
 METASCHEDULER_URL = "http://metascheduler.cern.tst.yandex.net/"
@@ -16,14 +17,11 @@ queue = ms.queue("docker_queue")
 
 JOB_TEMPLATE = {
     "descriptor": {
-        "input": [
-            # "local:/home/sashab1/ship-shield/code/worker.sh",
-            # "local:/home/sashab1/ship-shield/code/slave.py",
-        ],
+        "input": [],
 
         "container" : {
             "workdir" : "",
-            "name" : "olantwin/ship-shield:20170818",
+            "name": "{}:{}".format(config.IMAGE, config.IMAGE_TAG),
             "volumes": ["/home/sashab1/ship-shield:/shield"],
             "cpu_needed" : 1,
             "max_memoryMB" : 1024,
@@ -161,7 +159,7 @@ def calculate_geofile(geofile, sampling, seed):
 
 
 def main():
-    logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format = "%(asctime)s %(process)s %(thread)s: %(message)s")
+    logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format="%(asctime)s %(process)s %(thread)s: %(message)s")
     logging.info("The result for geo_1 is: {}".format(calculate_geofile("geo_1.root")))
 
 if __name__ == '__main__':
