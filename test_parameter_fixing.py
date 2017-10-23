@@ -13,10 +13,6 @@ def _AddFixedParams(point):
 test_stripped_point = [
     # Units all in cm Lengths:
     200. + 5., 200. + 5., 275. + 5., 240. + 5., 300. + 5., 235. + 5.,
-    # MagnAbsorb1:
-    40., 40., 150., 150., 2., 2.,
-    # MagnAbsorb2:
-    80., 80., 150., 150., 2., 2.,
     # Magn1:
     87., 65., 35., 121, 11., 2.,
     # Magn2:
