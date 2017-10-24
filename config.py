@@ -4,4 +4,4 @@ FIXED_PARAMS = [
 ]
 FIXED_RANGES = [(0, 2), (8, 20)]
 IMAGE = 'olantwin/ship-shield'
-IMAGE_TAG = '20170818'
+IMAGE_TAG = '20170531' # '20170818' for T4

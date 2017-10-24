@@ -11,7 +11,7 @@ from fcn import FCN
 
 Z_T4 = 3538
 Z_T1 = Z_T4 - 940
-Z_Sensitive_Plane = Z_T4
+Z_Sensitive_Plane = Z_T1
 
 
 def graph_tracks(event):
