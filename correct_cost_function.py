@@ -5,7 +5,7 @@ import argparse
 from array import array
 import ROOT as r
 from get_geo import magnetMass, magnetLength
-from analyse import FCN
+from disney_common import FCN
 
 
 # TODO use version from reconstruct_vector.py

@@ -7,7 +7,7 @@ import ROOT as r
 import shipunit as u
 import rootUtils as ut
 from get_geo import get_geo
-from fcn import FCN
+from disney_common import FCN
 
 Z_T4 = 3538
 Z_T1 = Z_T4 - 940

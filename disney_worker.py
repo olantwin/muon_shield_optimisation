@@ -8,10 +8,10 @@ import filelock
 from sh import docker
 from skysteer import calculate_geofile
 import grpc
-from fcn import FCN
 import disneylandClient.disneyland_pb2
 from disneylandClient.disneyland_pb2 import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
 import disney_common as common
+from disney_common import FCN
 from common import generate_geo
 import config
 
