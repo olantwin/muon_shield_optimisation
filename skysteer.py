@@ -26,7 +26,13 @@ JOB_TEMPLATE = {
             "max_memoryMB": 1024,
             "min_memoryMB": 512,
             "run_id": "near_run3",
-            "cmd": "/bin/bash -l -c 'source /opt/FairShipRun/config.sh;  python2 /shield/code/slave.py --geofile /shield/geofiles/{geofile} -f /shield/worker_files/sampling_{sampling}/muons_{job_id}_16.root --results /output/result.csv --hists /output/hists.root --seed {seed}'",
+            "cmd": '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh; '''
+                   '''python2 /shield/code/slave.py '''
+                   '''--geofile /shield/geofiles/{geofile} '''
+                   '''-f /shield/worker_files/sampling_{sampling}/'''
+                   '''muons_{job_id}_16.root '''
+                   '''--results /output/result.csv '''
+                   '''--hists /output/hists.root --seed {seed}''',
         },
 
         "required_outputs": {
@@ -40,7 +46,7 @@ JOB_TEMPLATE = {
 
 
 def push_jobs_for_geofile(geofile, sampling, seed):
-    logging.info("Submitting job for geofile {}".format(geofile))
+    logging.info("Submitting job for geofile %s", geofile)
     jobs = []
     for i in xrange(1, 16+1):
         tmpl = copy.deepcopy(JOB_TEMPLATE)
@@ -114,13 +120,14 @@ def wait_jobs(jobs):
             log.info("{} All jobs completed!".format(time()))
             break
 
+
 def get_result(jobs):
     sum_result = 0.
     for job in jobs:
         if job.status != "completed":
             raise Exception("Incomplete job while calculating result: {}".format(job.job_id))
 
-        var = filter(lambda o: o.startswith("variable"), job.output)[0]
+        var = [o for o in job.output if o.startswith("variable")][0]
         result = float(var.split(":", 1)[1].split("=", 1)[1])
         sum_result += result
 
@@ -155,12 +162,3 @@ def calculate_geofile(geofile, sampling, seed):
     wait_jobs(jobs)
     dump_jobs(jobs, geo_filename)
     return get_result(jobs)
-
-
-def main():
-    logging.basicConfig(filename = './logs/runtime.log', level = logging.INFO, format="%(asctime)s %(process)s %(thread)s: %(message)s")
-    logging.info("The result for geo_1 is: {}".format(calculate_geofile("geo_1.root")))
-
-
-if __name__ == '__main__':
-    main()
