@@ -8,8 +8,8 @@ from skopt import Optimizer
 from skopt.learning import GaussianProcessRegressor, RandomForestRegressor, GradientBoostingQuantileRegressor
 
 import grpc
-import disneylandClient.disneyland_pb2
-from disneylandClient.disneyland_pb2 import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
+from disneylandClient import new_client, Worker, Job, RequestWithId
+from disneylandClient import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
 
 SLEEP_TIME = 5  # seconds
 POINTS_IN_BATCH = 100
@@ -18,34 +18,58 @@ POINTS_IN_BATCH = 100
 def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
-        jobs_completed = [stub.GetJob(RequestWithId(
-            id=x.id)).status in STATUS_FINAL for x in jobs]
+
+        jobs_completed = [stub.GetJob(RequestWithId(id=x.id)).status in STATUS_FINAL
+                          for x in docker_jobs
+                          for docker_jobs in jobs]
+
         if all(jobs_completed):
             break
+
+
+def ParseJobOutput(job_output):
+    return 0, 0, 0
 
 
 def ProcessJobs(jobs, space, tag):
     X = []
     y = []
 
-    for job in jobs:
-        if job.metadata == tag and job.status == disneylandClient.disneyland_pb2.Job.COMPLETED:
-            params = common.StripFixedParams(common.ParseParams(job.input))
-            if space.__contains__(params):
+    for dokcer_jobs in jobs:
+        chi2s = 0
+        failed = 0
+        for docker_job in docker_jobs:
+            if docker_job.metadata == tag and docker_job.status == Job.COMPLETED:
+                chi2, weight, length = ParseJobOutput(docker_job.output)
+                chi2s += chi2
+
+            elif docker_job.status == Job.FAILED:
+                failed = 1
+                break
+
+        if failed == 0:
+            params = common.ParseParams(docker_job[0].input['params'])
+            if params in space:
                 X.append(params)
-                y.append(float(job.output))
+                y.append(common.FCN(weight, chi2s, length))
     return X, y
 
 
+def CreateJobInput(point, number):
+    return JOB_TEMPLATE
+
+
 STATUS_IN_PROGRESS = set([
-    disneylandClient.disneyland_pb2.Job.PENDING,
-    disneylandClient.disneyland_pb2.Job.PULLED,
-    disneylandClient.disneyland_pb2.Job.RUNNING,
+    Job.PENDING,
+    Job.PULLED,
+    Job.RUNNING,
 ])
 STATUS_FINAL = set([
-    disneylandClient.disneyland_pb2.Job.COMPLETED,
-    disneylandClient.disneyland_pb2.Job.FAILED,
+    Job.COMPLETED,
+    Job.FAILED,
 ])
+
+JOB_TEMPLATE = {}
 
 config_dict = disneylandClient.initClientConfig(
     "/Users/sashab1/.disney/config.yml")
@@ -80,9 +104,12 @@ def main():
 
         shield_jobs = []
         for point in points:
-            shield_jobs.append(stub.CreateJob(Job(input=str(point),
-                                                  kind='shield-configuration',
-                                                  metadata=tag)))
+            docker_jobs = []
+            for i in xrange(16):
+                docker_jobs.append(stub.CreateJob(Job(input=CreateJobInput(point, i),
+                                                      kind='shield-configuration',
+                                                      metadata=tag)))
+            shield_jobs.append(docker_jobs)
 
         WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
