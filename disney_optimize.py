@@ -3,13 +3,13 @@ import argparse
 
 import disney_common as common
 
-from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
-from skopt.learning import GaussianProcessRegressor, RandomForestRegressor, GradientBoostingQuantileRegressor
+from skopt.learning import RandomForestRegressor
 
 import grpc
-from disneylandClient import new_client, Worker, Job, RequestWithId
-from disneylandClient import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
+import disneylandClient
+from disneylandClient import (Job, RequestWithId,
+                              ListJobsRequest, DisneylandStub)
 
 SLEEP_TIME = 5  # seconds
 POINTS_IN_BATCH = 100
@@ -19,9 +19,10 @@ def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
 
-        jobs_completed = [stub.GetJob(RequestWithId(id=x.id)).status in STATUS_FINAL
-                          for x in docker_jobs
-                          for docker_jobs in jobs]
+        jobs_completed = [stub.GetJob(RequestWithId(id=x.id)).status
+                          in STATUS_FINAL
+                          for docker_jobs in jobs
+                          for x in docker_jobs]
 
         if all(jobs_completed):
             break
@@ -35,20 +36,21 @@ def ProcessJobs(jobs, space, tag):
     X = []
     y = []
 
-    for dokcer_jobs in jobs:
+    for docker_jobs in jobs:
         chi2s = 0
-        failed = 0
+        failed = False
         for docker_job in docker_jobs:
-            if docker_job.metadata == tag and docker_job.status == Job.COMPLETED:
+            if (docker_job.metadata == tag and
+                    docker_job.status == Job.COMPLETED):
                 chi2, weight, length = ParseJobOutput(docker_job.output)
                 chi2s += chi2
 
             elif docker_job.status == Job.FAILED:
-                failed = 1
+                failed = True
                 break
 
-        if failed == 0:
-            params = common.ParseParams(docker_job[0].input['params'])
+        if not failed:
+            params = common.ParseParams(docker_jobs[0].input['params'])
             if params in space:
                 X.append(params)
                 y.append(common.FCN(weight, chi2s, length))
@@ -72,9 +74,9 @@ STATUS_FINAL = set([
 JOB_TEMPLATE = {}
 
 config_dict = disneylandClient.initClientConfig(
-    "/Users/sashab1/.disney/config.yml")
+    '/Users/sashab1/.disney/config.yml')
 creds = disneylandClient.getCredentials()
-channel = grpc.secure_channel(config_dict.get("connect_to"), creds)
+channel = grpc.secure_channel(config_dict.get('connect_to'), creds)
 stub = DisneylandStub(channel)
 
 
@@ -82,7 +84,7 @@ def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
     parser.add_argument('-opt', help='Write an optimizer.')
     clf_type = parser.parse_args().opt
-    tag = "discrete2_{opt}".format(opt=clf_type)
+    tag = 'discrete2_{opt}'.format(opt=clf_type)
 
     space = common.CreateDiscreteSpace()
     if clf_type == 'rf':
@@ -102,14 +104,15 @@ def main():
 
         points = [common.AddFixedParams(p) for p in points]
 
-        shield_jobs = []
-        for point in points:
-            docker_jobs = []
-            for i in xrange(16):
-                docker_jobs.append(stub.CreateJob(Job(input=CreateJobInput(point, i),
-                                                      kind='shield-configuration',
-                                                      metadata=tag)))
-            shield_jobs.append(docker_jobs)
+        shield_jobs = [
+            stub.CreateJob(Job(
+                input=CreateJobInput(point, i),
+                kind='shield-configuration',
+                metadata=tag
+            ))
+            for i in range(16)
+            for point in points
+        ]
 
         WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
