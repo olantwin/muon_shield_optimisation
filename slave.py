@@ -4,6 +4,8 @@ from time import sleep
 import copy
 import json
 import argparse
+import shutil
+from multiprocessing import Process, Queue
 import filelock
 import ROOT as r
 import config
@@ -14,7 +16,7 @@ import shipDet_conf
 from analyse import analyse
 from disney_common import create_id, ParseParams
 from common import generate_geo
-from get_geo import magnetMass, magnetLength
+from get_geo import get_geo
 
 
 def generate(
@@ -22,8 +24,7 @@ def generate(
         paramFile,
         outFile,
         seed=1,
-        nEvents=None,
-        save_geo=False
+        nEvents=None
 ):
     """Generate muon background and transport it through the geometry.
 
@@ -88,73 +89,83 @@ def generate(
     run.SetStoreTraj(r.kFALSE)
     run.Init()
     print 'Initialised run.'
-    # if save_geo:
-    #     run.CreateGeometryFile(
-    #         paramFile.replace('params', 'geo').replace('shared', 'output')
-    #     )
-    # sGeo = r.gGeoManager
-    # muonShield = sGeo.GetVolume('MuonShieldArea')
-    # length = magnetLength(muonShield)
-    # weight = magnetMass(muonShield)
-    # if weight < 3e6:
     geomGeant4.setMagnetField()
     print 'Start run of {} events.'.format(nEvents)
     run.Run(nEvents)
-    sGeo = r.gGeoManager
-    muonShield = sGeo.GetVolume('MuonShieldArea')
-    length = magnetLength(muonShield)
-    weight = magnetMass(muonShield)
-    return weight, length
+    print 'Finished simulation of {} events.'.format(nEvents)
 
 
 def main():
 
-    paramFile = '/shared/params_{}.root'.format(create_id(args.params))
-    lockfile = paramFile + '.lock'
-    responsible_for_geo = False
+    tmpl = copy.deepcopy(config.RESULTS_TEMPLATE)
 
-    while not os.path.exists(paramFile):
+    paramFile = '/shared/params_{}.root'.format(create_id(args.params))
+    heavy = '/shared/heavy'
+    lockfile = paramFile + '.lock'
+
+    while not os.path.exists(paramFile) and not os.path.exists(heavy):
         lock = filelock.FileLock(lockfile)
         if not lock.is_locked:
             with lock:
-                responsible_for_geo = True
-                paramFile = generate_geo(paramFile, ParseParams(args.params))
+                tmp_paramFile = generate_geo(
+                    paramFile.replace('.', '.tmp.'),
+                    ParseParams(args.params)
+                )
+                q = Queue()
+
+                def get_geo_info(queue, arguments):
+                    queue.put(get_geo(*arguments))
+
+                p = Process(get_geo_info, args=(
+                    q,
+                    (
+                        tmp_paramFile,
+                        '/output',
+                        paramFile.replace('params', 'geo')
+                    )
+                ))
+                p.start()
+                p.join()
+                length, weight = q.get()
+                tmpl['weight'] = weight
+                tmpl['length'] = length
+                if weight >= 3e6:
+                    open(heavy, 'a').close()
+                    with open(args.results, 'w') as f:
+                        json.dump(tmpl, f)
+                else:
+                    shutil.move(tmp_paramFile, paramFile)
         else:
             sleep(60)
 
     outFile = "/output/ship.conical.MuonBack-TGeant4.root"
-    tmpl = copy.deepcopy(config.RESULTS_TEMPLATE)
     try:
         try:
-            weight, length = generate(
+            generate(
                 inputFile=args.input,
                 paramFile=paramFile,
                 outFile=outFile,
                 seed=args.seed,
-                nEvents=args.nEvents,
-                save_geo=responsible_for_geo
+                nEvents=args.nEvents
             )
-            tmpl['weight'] = weight
-            tmpl['length'] = length
         except Exception, e:
             raise RuntimeError(
                 "Simulation failed with exception: %s",
                 e
             )
         try:
-            if weight and weight < 3e6:
-                chain = r.TChain('cbmsim')
-                chain.Add(outFile)
-                xs = analyse(chain, args.hists)
-                tmpl['muons'] = len(xs)
-                tmpl['muons_w'] = sum(xs)
+            chain = r.TChain('cbmsim')
+            chain.Add(outFile)
+            xs = analyse(chain, args.hists)
+            tmpl['muons'] = len(xs)
+            tmpl['muons_w'] = sum(xs)
         except Exception, e:
             raise RuntimeError(
                 "Analysis failed with exception: %s",
                 e
             )
     except RuntimeError, e:
-        tmpl['error'] = e
+        tmpl['error'] = e.__repr__()
     finally:
         with open(args.results, 'w') as f:
             json.dump(tmpl, f)

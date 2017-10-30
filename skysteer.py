@@ -116,11 +116,13 @@ def get_result(jobs):
             logging.error(results.error)
         results.append(result)
 
-    # TODO sanity check: check that weights/lengths agree
-    weight = float(results[0]['weight'])
-    length = float(results[0]['length'])
-    muons = sum(int(result['muons']) for result in results)
-    muons_w = sum(float(result['muons_w']) for result in results)
+    weight = float([r['weight'] for r in results if r['weight']][0])
+    length = float([r['length'] for r in results if r['length']][0])
+    if weight < 3e6:
+        muons = sum(int(result['muons']) for result in results)
+        muons_w = sum(float(result['muons_w']) for result in results)
+    else:
+        muons, muons_w = None, 0
     return weight, length, muons, muons_w
 
 
