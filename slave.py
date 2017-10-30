@@ -5,7 +5,7 @@ import copy
 import json
 import argparse
 import shutil
-from multiprocessing import Process, Queue
+import subprocess
 import filelock
 import ROOT as r
 import config
@@ -111,22 +111,24 @@ def main():
                     paramFile.replace('.', '.tmp.'),
                     ParseParams(args.params)
                 )
-                q = Queue()
-
-                def get_geo_info(queue, arguments):
-                    queue.put(get_geo(*arguments))
-
-                p = Process(get_geo_info, args=(
-                    q,
-                    (
-                        tmp_paramFile,
-                        '/output',
-                        paramFile.replace('params', 'geo')
+                subprocess.call(
+                    [
+                        'python2',
+                        'get_geo.py',
+                        '-g', tmp_paramFile,
+                        '-o', paramFile.replace('params', 'geoinfo')
+                        ])
+                shutil.move(
+                    '/shield/geo/' + os.path.basename(tmp_paramFile),
+                    paramFile.replace(
+                        'shared', 'output'
+                    ).replace(
+                        'params', 'geo'
                     )
-                ))
-                p.start()
-                p.join()
-                length, weight = q.get()
+                )
+                with open(paramFile.replace('params', 'geoinfo'), 'r') as f:
+                    length, weight = f.read().strip().split(',')
+
                 tmpl['weight'] = weight
                 tmpl['length'] = length
                 if weight >= 3e6:
@@ -137,6 +139,9 @@ def main():
                     shutil.move(tmp_paramFile, paramFile)
         else:
             sleep(60)
+
+    if os.path.exists(heavy):
+        return
 
     outFile = "/output/ship.conical.MuonBack-TGeant4.root"
     try:
