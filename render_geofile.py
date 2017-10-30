@@ -13,9 +13,15 @@ def render_geofile(geofile):
     muonshield = geo.GetVolume('MuonShieldArea')
     muonshield.Draw('ogl')
     viewer = r.gPad.GetViewer3D()
+    camera = viewer.CurrentCamera()
     viewer.GetFrame().Resize(1200, 800)
     sleep(1)
-    filename = os.path.splitext(geofile)[0] + '.png'
+    filename = os.path.splitext(geofile)[0] + '_zy.png'
+    print filename
+    viewer.SavePictureWidth(str(filename), 4800)
+    camera.RotateRad(-r.TMath.Pi()/2., 0)
+    viewer.DoDraw()
+    filename = os.path.splitext(geofile)[0] + '_zx.png'
     print filename
     viewer.SavePictureWidth(str(filename), 4800)
     print 2 * muonshield.GetShape().GetDZ()
