@@ -87,6 +87,7 @@ def generate(
     run.SetGenerator(primGen)
     run.SetStoreTraj(r.kFALSE)
     run.Init()
+    print 'Initialised run.'
     if save_geo:
         run.CreateGeometryFile(
             paramFile.replace('params', 'geo').replace('shared', 'output')
@@ -97,6 +98,7 @@ def generate(
     weight = magnetMass(muonShield)
     if weight < 3e6:
         geomGeant4.setMagnetField()
+        print 'Start run of {} events.'.format(nEvents)
         run.Run(nEvents)
     return weight, length
 
@@ -133,7 +135,7 @@ def main():
         except Exception, e:
             raise RuntimeError(
                 "Simulation failed with exception: %s",
-                e.stderr
+                e
             )
         try:
             if weight and weight < 3e6:
@@ -145,7 +147,7 @@ def main():
         except Exception, e:
             raise RuntimeError(
                 "Analysis failed with exception: %s",
-                e.stderr
+                e
             )
     except RuntimeError, e:
         tmpl['error'] = e.stderr
