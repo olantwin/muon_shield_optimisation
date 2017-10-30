@@ -1,5 +1,5 @@
 click==6.7
-disneylandClient==0.1
+git+https://github.com/skygrid/pydisneyland.git@01432a4f3f36edf742d5026b6beed9132c1c3c7c
 filelock==2.0.12
 matplotlib==2.1.0
 numexpr==2.6.1
@@ -12,4 +12,4 @@ scikit-learn==0.19.0
 scikit-optimize==0.4
 scipy==0.19.1
 sh==1.12.13
-skygrid-libscheduler==0.5.9
+git+https://github.com/skygrid/libscheduler.git@dc8853a523c4d1e3fac10494c0ada85f46566697
