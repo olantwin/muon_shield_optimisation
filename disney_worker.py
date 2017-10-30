@@ -1,19 +1,13 @@
 #!/usr/bin/env python2
-import os
 import time
 import json
 from multiprocessing import Queue, Process
 import logging
-import filelock
-from sh import docker
-from skysteer import calculate_geofile
+from skysteer import calculate_point
 import grpc
 import disneylandClient.disneyland_pb2
-from disneylandClient.disneyland_pb2 import Job, RequestWithId, ListOfJobs, ListJobsRequest, DisneylandStub
-import disney_common as common
+from disneylandClient.disneyland_pb2 import ListJobsRequest, DisneylandStub
 from disney_common import FCN
-from common import generate_geo
-import config
 
 SLEEP_TIME = 5 * 60  # seconds
 WORK_DIR = 'root://eoslhcb.cern.ch/'
@@ -40,30 +34,27 @@ def compute_FCN(job):
         job.input
     )
 
-    geoFile = '{}/input_files/geo_{}.root'.format(WORK_DIR, job.id)
-    if not os.path.isfile(geoFile):
-        log.error("Geofile does not exist, exiting!")
+    try:
+        weight, length, muons, muons_w = calculate_point(
+            params=job.input,
+            sampling=37,
+            seed=1
+        )
+    except Exception, e:
+        log.exception(e)
         job.status = disneylandClient.disneyland_pb2.Job.FAILED
         stub.ModifyJob(job)
         return
 
-    with open(os.path.join(WORK_DIR, 'input_files/geo_{}.lw.csv'.format(job.id))) as lw_f:
-        length, weight = map(float, lw_f.read().strip().split(","))
+    metric = FCN(weight, muons_w, length) if weight < 3e6 else 1e8
 
-    result = {'weight': weight, 'length': length, 'metric': 1e+8, 'chi2s': -1}
-
-    if weight < 3e+6:
-        try:
-            chi2s = calculate_geofile(geoFile, sampling=37, seed=1)
-        except Exception, e:
-            log.exception(e)
-            job.status = disneylandClient.disneyland_pb2.Job.FAILED
-            stub.ModifyJob(job)
-            return
-
-        metric = FCN(weight, chi2s, length)
-        result['metric'] = metric
-        result['chi2s'] = chi2s
+    result = {
+        'weight': weight,
+        'length': length,
+        'metric': metric,
+        'chi2s': muons_w,
+        'muons': muons
+    }
 
     job.output = json.dumps(result)
     job.status = disneylandClient.disneyland_pb2.Job.COMPLETED
@@ -78,38 +69,7 @@ def fcn_worker(task_queue, lockfile):
         if not job:
             break
 
-        lock = filelock.FileLock(lockfile)
-        with lock:
-            create_geofile(job)
-
         compute_FCN(job)
-
-
-def create_geofile(job):
-    geoFile = generate_geo('{}/input_files/geo_{}.root'.format(
-        WORK_DIR, job.id), common.ParseParams(job.input))
-
-    log = logging.getLogger('create_geofile')
-    try:
-        log.info("Running docker: " + job.input)
-        docker.run(
-            "--rm",
-            "-v", "{}:/shield".format(WORK_DIR),
-            "{}:{}".format(config.IMAGE, config.IMAGE_TAG),
-            '/bin/bash',
-            '-l',
-            '-c',
-            "source /opt/FairShipRun/config.sh; python2 /shield/code/get_geo.py -g /shield/input_files/geo_{0}.root -o /shield/input_files/geo_{0}.lw.csv".format(
-                job.id)
-        )
-        log.info("Docker finished!")
-        return True
-    except Exception, e:
-        log.exception(
-            'Docker finished with error, hope it is fine! %s',
-            e
-        )
-        return False
 
 
 def main():
