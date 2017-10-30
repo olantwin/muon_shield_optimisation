@@ -88,18 +88,22 @@ def generate(
     run.SetStoreTraj(r.kFALSE)
     run.Init()
     print 'Initialised run.'
-    if save_geo:
-        run.CreateGeometryFile(
-            paramFile.replace('params', 'geo').replace('shared', 'output')
-        )
+    # if save_geo:
+    #     run.CreateGeometryFile(
+    #         paramFile.replace('params', 'geo').replace('shared', 'output')
+    #     )
+    # sGeo = r.gGeoManager
+    # muonShield = sGeo.GetVolume('MuonShieldArea')
+    # length = magnetLength(muonShield)
+    # weight = magnetMass(muonShield)
+    # if weight < 3e6:
+    geomGeant4.setMagnetField()
+    print 'Start run of {} events.'.format(nEvents)
+    run.Run(nEvents)
     sGeo = r.gGeoManager
     muonShield = sGeo.GetVolume('MuonShieldArea')
     length = magnetLength(muonShield)
     weight = magnetMass(muonShield)
-    if weight < 3e6:
-        geomGeant4.setMagnetField()
-        print 'Start run of {} events.'.format(nEvents)
-        run.Run(nEvents)
     return weight, length
 
 
@@ -150,7 +154,7 @@ def main():
                 e
             )
     except RuntimeError, e:
-        tmpl['error'] = e.stderr
+        tmpl['error'] = e
     finally:
         with open(args.results, 'w') as f:
             json.dump(tmpl, f)
