@@ -16,7 +16,6 @@ import shipDet_conf
 from analyse import analyse
 from disney_common import create_id, ParseParams
 from common import generate_geo
-from get_geo import get_geo
 
 
 def generate(
@@ -114,7 +113,7 @@ def main():
                 subprocess.call(
                     [
                         'python2',
-                        'get_geo.py',
+                        '/code/get_geo.py',
                         '-g', tmp_paramFile,
                         '-o', paramFile.replace('params', 'geoinfo')
                         ])
@@ -127,16 +126,16 @@ def main():
                     )
                 )
                 with open(paramFile.replace('params', 'geoinfo'), 'r') as f:
-                    length, weight = f.read().strip().split(',')
+                    length, weight = map(float, f.read().strip().split(','))
 
                 tmpl['weight'] = weight
                 tmpl['length'] = length
-                if weight >= 3e6:
+                if weight < 3e6:
+                    shutil.move(tmp_paramFile, paramFile)
+                else:
                     open(heavy, 'a').close()
                     with open(args.results, 'w') as f:
                         json.dump(tmpl, f)
-                else:
-                    shutil.move(tmp_paramFile, paramFile)
         else:
             sleep(60)
 
@@ -174,7 +173,8 @@ def main():
     finally:
         with open(args.results, 'w') as f:
             json.dump(tmpl, f)
-        os.remove(outFile)
+        if os.path.exists(outFile):
+            os.remove(outFile)
 
 
 if __name__ == '__main__':
