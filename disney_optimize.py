@@ -2,6 +2,8 @@ import time
 import argparse
 
 import disney_common as common
+import config
+import copy
 
 from skopt import Optimizer
 from skopt.learning import RandomForestRegressor
@@ -29,7 +31,7 @@ def WaitCompleteness(jobs):
 
 
 def ParseJobOutput(job_output):
-    return 0, 0, 0
+    return float(job_output['chi2s']), float(job_output['weight']), float(job_output['length'])
 
 
 def ProcessJobs(jobs, space, tag):
@@ -58,7 +60,15 @@ def ProcessJobs(jobs, space, tag):
 
 
 def CreateJobInput(point, number):
-    return JOB_TEMPLATE
+    job = copy.deepcopy(JOB_TEMPLATE)
+    job['descriptor']['container']['cmd'] = \
+    job['descriptor']['container']['cmd'].format(params=str(point), 
+                                                 sampling=37, 
+                                                 seed=1, 
+                                                 job_id=number
+                                                 )
+
+    return job
 
 
 STATUS_IN_PROGRESS = set([
