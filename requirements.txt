@@ -1,6 +1,6 @@
 click==6.7
 Cython==0.27.1
-git+https://github.com/skygrid/pydisneyland.git@01432a4f3f36edf742d5026b6beed9132c1c3c7c
+git+https://github.com/skygrid/pydisneyland.git@48f1c1b1c9d3a2372377cde5db8970e5e0a0fda4
 filelock==2.0.12
 matplotlib==2.1.0
 numexpr==2.6.1

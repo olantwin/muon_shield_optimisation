@@ -70,7 +70,7 @@ def CreateJobInput(point, number):
             job_id=number
         )
 
-    return job
+    return json.dumps(job)
 
 
 STATUS_IN_PROGRESS = set([
