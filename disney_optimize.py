@@ -31,7 +31,8 @@ def WaitCompleteness(jobs):
 
 
 def ParseJobOutput(job_output):
-    return float(job_output['chi2s']), float(job_output['weight']), float(job_output['length'])
+    output = json.loads(job_output)
+    return float(output['chi2s']), float(output['weight']), float(output['length'])
 
 
 def ProcessJobs(jobs, space, tag):
