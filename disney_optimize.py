@@ -88,20 +88,20 @@ stub = disneylandClient.new_client()
 
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
-    parser.add_argument('-opt', help='Write an optimizer.')
+    parser.add_argument('-opt', help='Write an optimizer.', default='rf')
     clf_type = parser.parse_args().opt
     tag = 'discrete2_{opt}'.format(opt=clf_type)
 
     space = common.CreateDiscreteSpace()
-    if clf_type == 'rf':
-        clf = Optimizer(
-            space,
-            RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
-        )
+    clf = Optimizer(
+        space,
+        RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
+    ) if clf_type == 'rf' else None
 
-    all_jobs = stub.ListJobs(ListJobsRequest())
-    X, y = ProcessJobs(all_jobs, space, tag)
-    clf.tell(X, y)
+    all_jobs_list = stub.ListJobs(ListJobsRequest())
+    X, y = ProcessJobs(all_jobs_list.jobs, space, tag)
+    if X and y:
+        clf.tell(X, y)
 
     while True:
         points = clf.ask(
