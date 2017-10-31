@@ -32,13 +32,6 @@ def WaitCompleteness(jobs):
             break
 
 
-def ParseJobOutput(job_output):
-    output = json.loads(job_output)
-    return float(output['muons_w']), \
-        float(output['weight']), \
-        float(output['length'])
-
-
 def ExtractParams(docker_cmd):
     cmd_string = json.loads(docker_cmd)['descriptor']['container']['cmd']
     params = cmd_string[
