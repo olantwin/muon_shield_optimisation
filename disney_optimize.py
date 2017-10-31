@@ -2,7 +2,6 @@ import time
 import argparse
 import copy
 import json
-import re
 
 import disney_common as common
 import config
@@ -55,12 +54,13 @@ def ProcessJobs(jobs, space, tag):
     y = []
 
     for docker_jobs in jobs:
-        try:
-            weight, length, _, muons_w = common.get_result(docker_jobs)
-            y.append(common.FCN(weight, muons_w, length))
-            X.append(ExtractParams(docker_jobs[0].input))
-        except:
-            pass
+        if docker_jobs[0].metadata == tag:
+            try:
+                weight, length, _, muons_w = common.get_result(docker_jobs)
+                y.append(common.FCN(weight, muons_w, length))
+                X.append(ExtractParams(docker_jobs[0].input))
+            except:
+                pass
     return X, y
 
 
