@@ -1,9 +1,12 @@
 import time
 import argparse
 import copy
+import json
 
 import disney_common as common
 import config
+import re
+
 
 from skopt import Optimizer
 from skopt.learning import RandomForestRegressor
@@ -32,9 +35,14 @@ def WaitCompleteness(jobs):
 
 def ParseJobOutput(job_output):
     output = json.loads(job_output)
-    return float(output['chi2s']), \
+    return float(output['muons_w']), \
             float(output['weight']), \
             float(output['length'])
+
+def ExtractParams(docker_cmd):
+    cmd_string = json.loads(docker_cmd)['descriptor']['container']['cmd']
+    params = cmd_string[cmd_string.find('--params ') + len(--params ): cmd_string.find(' -f')]
+    return json.loads(params)
 
 
 def ProcessJobs(jobs, space, tag):
@@ -42,23 +50,12 @@ def ProcessJobs(jobs, space, tag):
     y = []
 
     for docker_jobs in jobs:
-        chi2s = 0
-        failed = False
-        for docker_job in docker_jobs:
-            if (docker_job.metadata == tag and
-                    docker_job.status == Job.COMPLETED):
-                chi2, weight, length = ParseJobOutput(docker_job.output)
-                chi2s += chi2
-
-            elif docker_job.status == Job.FAILED:
-                failed = True
-                break
-
-        if not failed:
-            params = common.ParseParams(docker_jobs[0].input['params'])
-            if params in space:
-                X.append(params)
-                y.append(common.FCN(weight, chi2s, length))
+        try:
+            weight, length, muons, muons_w = common.get_result(jobs)
+            y.append(common.FCN(weight, muons_w, length))
+            X.append(ExtractParams(job[0].input))
+        except:
+            pass
     return X, y
 
 
@@ -119,7 +116,7 @@ def main():
         shield_jobs = [
             stub.CreateJob(Job(
                 input=CreateJobInput(point, i),
-                kind='shield-configuration',
+                kind='docker',
                 metadata=tag
             ))
             for i in range(16)

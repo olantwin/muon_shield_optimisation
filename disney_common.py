@@ -57,6 +57,30 @@ def create_id(params):
     h.update(params_json)
     return h.hexdigest()
 
+def get_result(jobs):
+    results = []
+    for job in jobs:
+        if job.status != "completed":
+            raise Exception(
+                "Incomplete job while calculating result: %d",
+                job.job_id
+            )
+
+        var = [o for o in job.output if o.startswith("variable")][0]
+        result = json.load(var.split(":", 1)[1].split("=", 1)[1])
+        if result.error:
+            logging.error(results.error)
+        results.append(result)
+
+    weight = float([r['weight'] for r in results if r['weight']][0])
+    length = float([r['length'] for r in results if r['length']][0])
+    if weight < 3e6:
+        muons = sum(int(result['muons']) for result in results)
+        muons_w = sum(float(result['muons_w']) for result in results)
+    else:
+        muons, muons_w = None, 0
+    return weight, length, muons, muons_w
+
 
 def get_bounds():
     dZgap = 10.
