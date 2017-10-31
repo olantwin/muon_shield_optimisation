@@ -57,6 +57,7 @@ def create_id(params):
     h.update(params_json)
     return h.hexdigest()
 
+
 def get_result(jobs):
     results = []
     for job in jobs:
@@ -69,7 +70,7 @@ def get_result(jobs):
         var = [o for o in job.output if o.startswith("variable")][0]
         result = json.load(var.split(":", 1)[1].split("=", 1)[1])
         if result.error:
-            logging.error(results.error)
+            raise Exception(results.error)
         results.append(result)
 
     weight = float([r['weight'] for r in results if r['weight']][0])

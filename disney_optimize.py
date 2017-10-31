@@ -2,10 +2,10 @@ import time
 import argparse
 import copy
 import json
+import re
 
 import disney_common as common
 import config
-import re
 
 
 from skopt import Optimizer
@@ -36,12 +36,17 @@ def WaitCompleteness(jobs):
 def ParseJobOutput(job_output):
     output = json.loads(job_output)
     return float(output['muons_w']), \
-            float(output['weight']), \
-            float(output['length'])
+        float(output['weight']), \
+        float(output['length'])
+
 
 def ExtractParams(docker_cmd):
     cmd_string = json.loads(docker_cmd)['descriptor']['container']['cmd']
-    params = cmd_string[cmd_string.find('--params ') + len(--params ): cmd_string.find(' -f')]
+    params = cmd_string[
+        cmd_string.find('--params ')
+        + len('--params '):
+        cmd_string.find(' -f')
+    ]
     return json.loads(params)
 
 
@@ -51,9 +56,9 @@ def ProcessJobs(jobs, space, tag):
 
     for docker_jobs in jobs:
         try:
-            weight, length, muons, muons_w = common.get_result(jobs)
+            weight, length, _, muons_w = common.get_result(docker_jobs)
             y.append(common.FCN(weight, muons_w, length))
-            X.append(ExtractParams(job[0].input))
+            X.append(ExtractParams(docker_jobs[0].input))
         except:
             pass
     return X, y
@@ -114,12 +119,14 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            stub.CreateJob(Job(
-                input=CreateJobInput(point, i),
-                kind='docker',
-                metadata=tag
-            ))
-            for i in range(16)
+            [
+                stub.CreateJob(Job(
+                    input=CreateJobInput(point, i),
+                    kind='docker',
+                    metadata=tag
+                ))
+                for i in range(16)
+            ]
             for point in points
         ]
 
