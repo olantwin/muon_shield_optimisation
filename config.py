@@ -25,7 +25,7 @@ JOB_TEMPLATE = {
             "name": "{}:{}".format(IMAGE, IMAGE_TAG),
             "volumes": [
                 "/home/sashab1/ship-shield:/shield",
-                "/path/to/shared:/shared"  # TODO add shared folder path
+                "/home/sashab1/ship/shared:/shared"
             ],
             "cpu_needed": 1,
             "max_memoryMB": 1024,
