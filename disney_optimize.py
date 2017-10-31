@@ -11,10 +11,12 @@ import config
 from skopt import Optimizer
 from skopt.learning import RandomForestRegressor
 
-import grpc
 import disneylandClient
-from disneylandClient import (Job, RequestWithId,
-                              ListJobsRequest, DisneylandStub)
+from disneylandClient import (
+    Job,
+    RequestWithId,
+    ListJobsRequest
+)
 
 SLEEP_TIME = 5  # seconds
 POINTS_IN_BATCH = 100
@@ -81,11 +83,7 @@ STATUS_FINAL = set([
     Job.FAILED,
 ])
 
-config_dict = disneylandClient.initClientConfig(
-    '/Users/sashab1/.disney/config.yml')
-creds = disneylandClient.getCredentials()
-channel = grpc.secure_channel(config_dict.get('connect_to'), creds)
-stub = DisneylandStub(channel)
+stub = disneylandClient.new_client()
 
 
 def main():
