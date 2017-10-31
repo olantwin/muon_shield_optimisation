@@ -1,9 +1,9 @@
 import time
 import argparse
+import copy
 
 import disney_common as common
 import config
-import copy
 
 from skopt import Optimizer
 from skopt.learning import RandomForestRegressor
@@ -31,7 +31,9 @@ def WaitCompleteness(jobs):
 
 
 def ParseJobOutput(job_output):
-    return float(job_output['chi2s']), float(job_output['weight']), float(job_output['length'])
+    return float(job_output['chi2s']), \
+            float(job_output['weight']), \
+            float(job_output['length'])
 
 
 def ProcessJobs(jobs, space, tag):
@@ -60,13 +62,14 @@ def ProcessJobs(jobs, space, tag):
 
 
 def CreateJobInput(point, number):
-    job = copy.deepcopy(JOB_TEMPLATE)
+    job = copy.deepcopy(config.JOB_TEMPLATE)
     job['descriptor']['container']['cmd'] = \
-    job['descriptor']['container']['cmd'].format(params=str(point), 
-                                                 sampling=37, 
-                                                 seed=1, 
-                                                 job_id=number
-                                                 )
+        job['descriptor']['container']['cmd'].format(
+            params=str(point),
+            sampling=37,
+            seed=1,
+            job_id=number
+        )
 
     return job
 
@@ -80,8 +83,6 @@ STATUS_FINAL = set([
     Job.COMPLETED,
     Job.FAILED,
 ])
-
-JOB_TEMPLATE = {}
 
 config_dict = disneylandClient.initClientConfig(
     '/Users/sashab1/.disney/config.yml')
