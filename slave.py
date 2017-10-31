@@ -98,7 +98,10 @@ def main():
 
     tmpl = copy.deepcopy(config.RESULTS_TEMPLATE)
 
-    paramFile = '/shared/params_{}.root'.format(create_id(args.params))
+    paramFile = '/shared/params_{}.root'.format(
+        create_id(
+            ParseParams(args.params)
+            ))
     heavy = '/shared/heavy'
     lockfile = paramFile + '.lock'
 
