@@ -18,7 +18,7 @@ from disneylandClient import (
     ListJobsRequest
 )
 
-SLEEP_TIME = 5  # seconds
+SLEEP_TIME = 60  # seconds
 POINTS_IN_BATCH = 100
 
 
