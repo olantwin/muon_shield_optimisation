@@ -37,7 +37,7 @@ JOB_TEMPLATE = {
                    '''-f /shield/worker_files/sampling_{sampling}/'''
                    '''muons_{job_id}_16.root '''
                    '''--results /output/result.json '''
-                   '''--hists /output/hists.root --seed {seed}''',
+                   '''--hists /output/hists.root --seed {seed}' ''',
         },
 
         "required_outputs": {
