@@ -33,7 +33,7 @@ JOB_TEMPLATE = {
             "run_id": "near_run3",
             "cmd": '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh; '''
                    '''python2 /code/slave.py '''
-                   '''--params {params} '''
+                   '''--params "{params}" '''
                    '''-f /shield/worker_files/sampling_{sampling}/'''
                    '''muons_{job_id}_16.root '''
                    '''--results /output/result.json '''
@@ -47,4 +47,14 @@ JOB_TEMPLATE = {
             ]
         }
     }
+}
+METADATA_TEMPLATE = {
+    'user': {
+        'tag': '',
+        'sampling': 37,
+        'seed': 1,
+        'image_tag': IMAGE_TAG,
+        'params': []
+    },
+    'disney': {}
 }

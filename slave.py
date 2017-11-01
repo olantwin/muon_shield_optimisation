@@ -155,7 +155,7 @@ def main():
                 seed=args.seed,
                 nEvents=args.nEvents
             )
-        except Exception, e:
+        except Exception as e:
             raise RuntimeError(
                 "Simulation failed with exception: %s",
                 e
@@ -166,7 +166,7 @@ def main():
             xs = analyse(chain, args.hists)
             tmpl['muons'] = len(xs)
             tmpl['muons_w'] = sum(xs)
-        except Exception, e:
+        except Exception as e:
             raise RuntimeError(
                 "Analysis failed with exception: %s",
                 e
