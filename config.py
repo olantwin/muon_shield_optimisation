@@ -48,3 +48,12 @@ JOB_TEMPLATE = {
         }
     }
 }
+METADATA_TEMPLATE = {
+    'user': {
+        'tag': '',
+        'sampling': 37,
+        'seed': 1,
+        'image_tag': IMAGE_TAG,
+        'params': []
+    }
+}
