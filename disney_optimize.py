@@ -52,14 +52,14 @@ def ProcessJobs(jobs, space, tag):
     y = []
 
     for docker_jobs in jobs:
-        if docker_jobs[0].metadata == tag:
+        if json.loads(docker_jobs[0].metadata)['user']['tag'] == tag:
             try:
                 weight, length, _, muons_w = get_result(docker_jobs)
                 y.append(common.FCN(weight, muons_w, length))
                 X.append(ExtractParams(docker_jobs[0].input))
             except Exception as e:
                 print(e)
-                
+               
     return X, y
 
 

@@ -55,5 +55,6 @@ METADATA_TEMPLATE = {
         'seed': 1,
         'image_tag': IMAGE_TAG,
         'params': []
-    }
+    },
+    'disney': {}
 }
