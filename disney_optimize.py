@@ -3,6 +3,7 @@ import time
 import argparse
 import copy
 import json
+import base64
 
 import disney_common as common
 import config
@@ -37,14 +38,9 @@ def WaitCompleteness(jobs):
         print("[{}] Waiting...".format(time.time()))
 
 
-def ExtractParams(docker_cmd):
-    cmd_string = json.loads(docker_cmd)['descriptor']['container']['cmd']
-    params = cmd_string[
-        cmd_string.find('--params ')
-        + len('--params '):
-        cmd_string.find(' -f')
-    ]
-    return json.loads(params)
+def ExtractParams(metadata):
+    params = json.loads(metadata)['user']['params']
+    return common.ParseParams(params)
 
 
 def ProcessJobs(jobs, space, tag):
@@ -56,7 +52,7 @@ def ProcessJobs(jobs, space, tag):
             try:
                 weight, length, _, muons_w = get_result(docker_jobs)
                 y.append(common.FCN(weight, muons_w, length))
-                X.append(ExtractParams(docker_jobs[0].input))
+                X.append(ExtractParams(docker_jobs[0].metadata))
             except Exception as e:
                 print(e)
                
@@ -67,7 +63,7 @@ def CreateJobInput(point, number):
     job = copy.deepcopy(config.JOB_TEMPLATE)
     job['descriptor']['container']['cmd'] = \
         job['descriptor']['container']['cmd'].format(
-            params=str(point),
+            params=base64.b64encode(str(point)),
             sampling=37,
             seed=1,
             job_id=number
@@ -107,7 +103,7 @@ def CreateMetaData(point, tag, sampling, seed):
         ('tag', tag),
         ('params', str(point)),
         ('seed', seed),
-        ('sampling', sampling)
+        ('sampling', sampling),
     ])
     return json.dumps(metadata)
 

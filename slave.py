@@ -100,7 +100,7 @@ def main():
 
     paramFile = '/shared/params_{}.root'.format(
         create_id(
-            ParseParams(args.params)
+            ParseParams(args.params.decode('base64'))
             ))
     heavy = '/shared/heavy'
     lockfile = paramFile + '.lock'
