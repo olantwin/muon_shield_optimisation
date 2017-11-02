@@ -30,16 +30,17 @@ def StripFixedParams(point):
 def CreateDiscreteSpace():
     dZgap = 10
     zGap = dZgap / 2  # halflengh of gap
-    return Space(6 * [
+    dimensions = 8 * [
         Integer(170 + zGap, 300 + zGap)  # magnet lengths
-        ] + 6 * (
+        ] + 8 * (
             2 * [
                 Integer(10, 100)  # dXIn, dXOut
             ] + 2 * [
                 Integer(20, 200)  # dYIn, dYOut
             ] + 2 * [
                 Integer(2, 70)  # gapIn, gapOut
-            ]))
+            ])
+    return Space(StripFixedParams(dimensions))
 
 
 def AddFixedParams(point):
