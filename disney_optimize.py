@@ -66,7 +66,7 @@ def CreateJobInput(point, number):
             params=base64.b64encode(str(point).encode('utf8')).decode('utf8'),
             sampling=37,
             seed=1,
-            job_id=number
+            job_id=number+1
         )
 
     return json.dumps(job)

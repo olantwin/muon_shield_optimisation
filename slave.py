@@ -97,6 +97,9 @@ def generate(
 def main():
 
     tmpl = copy.deepcopy(config.RESULTS_TEMPLATE)
+    tmpl['args'] = vars(args)
+    with open(args.results, 'w') as f:
+        json.dump(tmpl, f)
 
     try:
         params = ParseParams(args.params.decode('base64'))
@@ -127,7 +130,7 @@ def main():
                         '-o', paramFile.replace('params', 'geoinfo')
                         ])
                 shutil.move(
-                    '/shield/geo/' + os.path.basename(tmp_paramFile),
+                    '/shield/geofiles/' + os.path.basename(tmp_paramFile),
                     paramFile.replace(
                         'shared', 'output'
                     ).replace(
