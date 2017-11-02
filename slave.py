@@ -98,10 +98,16 @@ def main():
 
     tmpl = copy.deepcopy(config.RESULTS_TEMPLATE)
 
-    paramFile = '/shared/params_{}.root'.format(
-        create_id(
-            ParseParams(args.params.decode('base64'))
-            ))
+    try:
+        paramFile = '/shared/params_{}.root'.format(
+            create_id(
+                ParseParams(args.params.decode('base64'))
+                ))
+    except Exception as e:
+        tmpl['error'] = e.__repr__()
+        with open(args.results, 'w') as f:
+            json.dump(tmpl, f)
+        raise
     heavy = '/shared/heavy'
     lockfile = paramFile + '.lock'
 
