@@ -8,7 +8,6 @@ import base64
 import disney_common as common
 import config
 
-
 from skopt import Optimizer
 from skopt.learning import RandomForestRegressor
 
@@ -20,17 +19,17 @@ from disneylandClient import (
 )
 
 SLEEP_TIME = 60  # seconds
-POINTS_IN_BATCH = 100
+POINTS_IN_BATCH = 80
 
 
 def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
 
-        jobs_completed = [stub.GetJob(RequestWithId(id=x.id)).status
+        jobs_completed = [stub.GetJob(RequestWithId(id=job.id)).status
                           in STATUS_FINAL
-                          for docker_jobs in jobs
-                          for x in docker_jobs]
+                          for point in jobs
+                          for job in point]
 
         if all(jobs_completed):
             break
@@ -43,20 +42,23 @@ def ExtractParams(metadata):
     return common.ParseParams(params)
 
 
-def ProcessJobs(jobs, space, tag):
-    X = []
-    y = []
+def ProcessPoint(jobs, space, tag):
+    if json.loads(jobs[0].metadata)['user']['tag'] == tag:
+        try:
+            weight, length, _, muons_w = get_result(jobs)
+            y = common.FCN(weight, muons_w, length)
+            X = ExtractParams(jobs[0].metadata)
+            return X, y
+        except Exception as e:
+            print(e)
 
-    for docker_jobs in jobs:
-        if json.loads(docker_jobs[0].metadata)['user']['tag'] == tag:
-            try:
-                weight, length, _, muons_w = get_result(docker_jobs)
-                y.append(common.FCN(weight, muons_w, length))
-                X.append(ExtractParams(docker_jobs[0].metadata))
-            except Exception as e:
-                print(e)
-               
-    return X, y
+
+def ProcessJobs(jobs, space, tag):
+    print("[{}] Processing jobs...".format(time.time()))
+    return zip(*[
+        ProcessPoint(point, space, tag)
+        for point in jobs
+    ])
 
 
 def CreateJobInput(point, number):
@@ -121,6 +123,17 @@ STATUS_FINAL = set([
 stub = disneylandClient.new_client()
 
 
+def SubmitPoint(point, tag, sampling, seed):
+    return [
+        stub.CreateJob(Job(
+            input=CreateJobInput(point, i),
+            kind='docker',
+            metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
+        ))
+        for i in range(16)
+    ]
+
+
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
     parser.add_argument('-opt', help='Write an optimizer.', default='rf')
@@ -147,14 +160,7 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            [
-                stub.CreateJob(Job(
-                    input=CreateJobInput(point, i),
-                    kind='docker',
-                    metadata=CreateMetaData(point, tag, sampling=37, seed=1)
-                ))
-                for i in range(16)
-            ]
+            SubmitPoint(point, tag, sampling=37, seed=1)
             for point in points
         ]
 
