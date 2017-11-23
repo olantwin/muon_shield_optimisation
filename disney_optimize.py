@@ -19,8 +19,7 @@ from disneylandClient import (
 )
 
 SLEEP_TIME = 60  # seconds
-POINTS_IN_BATCH = 80
-
+POINTS_IN_BATCH = 1
 
 def WaitCompleteness(jobs):
     while True:
@@ -48,6 +47,14 @@ def ProcessPoint(jobs, space, tag):
             weight, length, _, muons_w = get_result(jobs)
             y = common.FCN(weight, muons_w, length)
             X = ExtractParams(jobs[0].metadata)
+
+            stub.CreateJob(Job(
+                input='',
+                output=str(y),
+                kind='point',
+                metadata=jobs[0].metadata
+            ))
+            print(X, y)
             return X, y
         except Exception as e:
             print(e)
@@ -123,7 +130,7 @@ STATUS_FINAL = set([
 stub = disneylandClient.new_client()
 
 
-def SubmitPoint(point, tag, sampling, seed):
+def SubmitDockerJobs(point, tag, sampling, seed):
     return [
         stub.CreateJob(Job(
             input=CreateJobInput(point, i),
@@ -133,6 +140,19 @@ def SubmitPoint(point, tag, sampling, seed):
         for i in range(16)
     ]
 
+def ProcessPoints(disney_points, tag):
+    X = []
+    y = []
+
+    for point in disney_points:
+        if json.loads(point.metadata)['user']['tag'] == tag:
+            try:
+                X.append(ExtractParams(point.metadata))
+                y.append(float(point.output))
+            except Exception as e:
+                print(e)
+
+    return X, y
 
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
@@ -146,8 +166,8 @@ def main():
         RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
     ) if clf_type == 'rf' else None
 
-    all_jobs_list = stub.ListJobs(ListJobsRequest())
-    X, y = ProcessJobs(all_jobs_list.jobs, space, tag)
+    all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point'))
+    X, y = ProcessPoints(all_jobs_list.jobs, tag)
     if X and y:
         print('Received previous points ', X, y)
         clf.tell(X, y)
@@ -160,13 +180,14 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            SubmitPoint(point, tag, sampling=37, seed=1)
+            SubmitDockerJobs(point, tag, sampling=37, seed=1)
             for point in points
         ]
 
         WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
-        print('Received new points ', X, y)
+
+        print('Received new points ', X_new, y_new)
         clf.tell(X_new, y_new)
 
 
