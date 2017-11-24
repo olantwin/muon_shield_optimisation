@@ -113,7 +113,7 @@ def main():
     paramFile = '/shared/params_{}.root'.format(
         create_id(params)
     )
-    heavy = '/shared/heavy'
+    heavy = '/shared/heavy_{}'.format(create_id(params))
     lockfile = paramFile + '.lock'
 
     while not os.path.exists(paramFile) and not os.path.exists(heavy):
