@@ -21,6 +21,7 @@ from disneylandClient import (
 SLEEP_TIME = 60  # seconds
 POINTS_IN_BATCH = 1
 
+
 def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
@@ -62,10 +63,13 @@ def ProcessPoint(jobs, space, tag):
 
 def ProcessJobs(jobs, space, tag):
     print("[{}] Processing jobs...".format(time.time()))
-    return zip(*[
-        ProcessPoint(point, space, tag)
-        for point in jobs
-    ])
+    try:
+        Xs, ys = zip(*[
+            ProcessPoint(point, space, tag)
+            for point in jobs
+        ])
+    except TypeError:
+        return [], []
 
 
 def CreateJobInput(point, number):
@@ -140,6 +144,7 @@ def SubmitDockerJobs(point, tag, sampling, seed):
         for i in range(16)
     ]
 
+
 def ProcessPoints(disney_points, tag):
     X = []
     y = []
@@ -153,6 +158,7 @@ def ProcessPoints(disney_points, tag):
                 print(e)
 
     return X, y
+
 
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
