@@ -26,10 +26,16 @@ def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
 
-        jobs_completed = [stub.GetJob(RequestWithId(id=job.id)).status
+        ids = [job.id for point in jobs for job in point]
+        all_jobs_list = stub.ListJobs(ListJobsRequest())
+        submitted_jobs = [job for job in all_jobs_list.jobs if job.id in ids]
+        jobs_completed = [job.status
                           in STATUS_FINAL
-                          for point in jobs
-                          for job in point]
+                          for job in submitted_jobs]
+        # jobs_completed = [stub.GetJob(RequestWithId(id=job.id)).status
+        #                   in STATUS_FINAL
+        #                   for point in jobs
+        #                   for job in point]
 
         if all(jobs_completed):
             break
@@ -63,12 +69,15 @@ def ProcessPoint(jobs, space, tag):
 
 def ProcessJobs(jobs, space, tag):
     print("[{}] Processing jobs...".format(time.time()))
-    try:
-        Xs, ys = zip(*[
-            ProcessPoint(point, space, tag)
-            for point in jobs
-        ])
-    except TypeError:
+    results = [
+        ProcessPoint(point, space, tag)
+        for point in jobs
+    ]
+    print(f"Got results {results}")
+    results = [result for result in results if result]
+    if results:
+        return zip(*results)
+    else:
         return [], []
 
 
@@ -164,7 +173,7 @@ def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
     parser.add_argument('-opt', help='Write an optimizer.', default='rf')
     clf_type = parser.parse_args().opt
-    tag = 'discrete3_{opt}_test'.format(opt=clf_type)
+    tag = f'discrete3_{clf_type}'
 
     space = common.CreateDiscreteSpace()
     clf = Optimizer(
@@ -177,6 +186,20 @@ def main():
     if X and y:
         print('Received previous points ', X, y)
         clf.tell(X, y)
+    if not X or (X and len(X) < POINTS_IN_BATCH):
+        points = space.rvs(n_samples=POINTS_IN_BATCH)
+        points = [common.AddFixedParams(p) for p in points]
+
+        shield_jobs = [
+            SubmitPoint(point, tag, sampling=37, seed=1)
+            for point in points
+        ]
+
+        WaitCompleteness(shield_jobs)
+        X_new, y_new = ProcessJobs(shield_jobs, space, tag)
+        print('Received new points ', X_new, y_new)
+        if X_new and y_new:
+            clf.tell(X_new, y_new)
 
     while True:
         points = clf.ask(

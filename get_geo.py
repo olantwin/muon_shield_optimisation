@@ -19,7 +19,7 @@ def magnetMass(muonShield):
     m = 0.
     for node in nodes:
         volume = node.GetVolume()
-        if 'Magn' in volume.GetName():
+        if 'Mag' in volume.GetName():
             m += volume.Weight(0.01, 'a')
     return m
 
