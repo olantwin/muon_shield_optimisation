@@ -8,14 +8,15 @@ FIXED_PARAMS = [
 ]
 FIXED_RANGES = [(0, 2), (8, 20)]
 IMAGE = 'olantwin/ship-shield'
-IMAGE_TAG = '20171102.3_T1'  # '20171031_T4' for T4
+IMAGE_TAG = '20171124_T1'  # '20171031_T4' for T4
 RESULTS_TEMPLATE = {
-    'error': None,
+    'error': 'Some',
     'weight': None,
     'length': None,
     'muons': None,
     'muons_w': None,
-    'args': None
+    'args': None,
+    'status': None,
 }
 JOB_TEMPLATE = {
     "descriptor": {

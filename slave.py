@@ -101,6 +101,7 @@ def main():
     with open(args.results, 'w') as f:
         json.dump(tmpl, f)
 
+    tmpl['status'] = 'Parsing parameters...'
     try:
         params = ParseParams(args.params.decode('base64'))
     except Exception as e:
@@ -108,6 +109,7 @@ def main():
         with open(args.results, 'w') as f:
             json.dump(tmpl, f)
         raise
+    tmpl['status'] = 'Parsed parameters.'
     paramFile = '/shared/params_{}.root'.format(
         create_id(params)
     )
@@ -118,6 +120,7 @@ def main():
         lock = filelock.FileLock(lockfile)
         if not lock.is_locked:
             with lock:
+                tmpl['status'] = 'Aquired lock.'
                 tmp_paramFile = generate_geo(
                     paramFile.replace('.', '.tmp.'),
                     params
@@ -148,15 +151,21 @@ def main():
                     open(heavy, 'a').close()
                     with open(args.results, 'w') as f:
                         json.dump(tmpl, f)
+                tmpl['status'] = 'Created geometry.'
         else:
             sleep(60)
 
     if os.path.exists(heavy):
+        tmpl['status'] = 'Too heavy.'
+        tmpl['error'] = 'None.'
+        with open(args.results, 'w') as f:
+            json.dump(tmpl, f)
         return
 
     outFile = "/output/ship.conical.MuonBack-TGeant4.root"
     try:
         try:
+            tmpl['status'] = 'Simulating...'
             generate(
                 inputFile=args.input,
                 paramFile=paramFile,
@@ -170,6 +179,7 @@ def main():
                 e
             )
         try:
+            tmpl['status'] = 'Analysing...'
             chain = r.TChain('cbmsim')
             chain.Add(outFile)
             xs = analyse(chain, args.hists)
@@ -180,6 +190,7 @@ def main():
                 "Analysis failed with exception: %s",
                 e
             )
+        tmpl['error'] = None
     except RuntimeError, e:
         tmpl['error'] = e.__repr__()
     finally:
