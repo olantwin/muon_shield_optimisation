@@ -181,7 +181,7 @@ def main():
         RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
     ) if clf_type == 'rf' else None
 
-    all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point'))
+    all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
     if X and y:
         print('Received previous points ', X, y)
