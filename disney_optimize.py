@@ -27,21 +27,22 @@ def WaitCompleteness(jobs):
     while True:
         time.sleep(SLEEP_TIME)
 
-        ids = [job.id for point in jobs for job in point]
+        ids = [[job.id for job in point] for point in jobs]
         uncompleted_jobs = [
-            stub.GetJob(RequestWithId(id=id))
-            for id in ids
+            [stub.GetJob(RequestWithId(id=id))
+            for id in point] for point in ids
         ]
         jobs_completed = [job.status
                           in STATUS_FINAL
-                          for job in uncompleted_jobs]
+                          for point in uncompleted_jobs
+                          for job in point]
         # jobs_completed = [stub.GetJob(RequestWithId(id=job.id)).status
         #                   in STATUS_FINAL
         #                   for point in jobs
         #                   for job in point]
 
         if all(jobs_completed):
-            break
+            return uncompleted_jobs
 
         print("[{}] Waiting...".format(time.time()))
 
@@ -192,7 +193,7 @@ def main():
             for point in points
         ]
 
-        WaitCompleteness(shield_jobs)
+        shield_jobs = WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
 
         print('Received new points ', X_new, y_new)
