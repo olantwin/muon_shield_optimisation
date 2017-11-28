@@ -5,6 +5,7 @@ import base64
 import copy
 import config
 import disney_common as common
+from disney_common import get_result
 
 from disneylandClient import (
     new_client,
@@ -48,33 +49,47 @@ def CreateJobInput(point, number):
 
 
 def main():
-    stub = new_client()
-
     space = common.CreateDiscreteSpace()
     point = common.AddFixedParams(space.rvs()[0])
 
-    job = Job(
-        input=CreateJobInput(point, 15),
-        kind="docker",
-        metadata=CreateMetaData(point, 'test', sampling=37, seed=1)
-    )
+    jobs = [
+        stub.CreateJob(Job(
+            input=CreateJobInput(point, i),
+            kind='docker',
+            metadata=CreateMetaData(point, 'test_oneshot', sampling=37, seed=1)
+        ))
+        for i in range(16)
+    ]
+    uncompleted_jobs = jobs
 
-    job = stub.CreateJob(job)
-    print("Job", job)
+    print("Job", jobs[0])
 
     while True:
         time.sleep(3)
-        job = stub.GetJob(RequestWithId(id=job.id))
-        print("[{}] Job :\n {}\n".format(time.time(), job))
+        uncompleted_jobs = [
+            stub.GetJob(RequestWithId(id=job.id))
+            for job in uncompleted_jobs
+        ]
+        print("[{}] Job :\n {}\n".format(time.time(), uncompleted_jobs[0]))
 
-        if job.status in STATUS_FINAL:
+        uncompleted_jobs = [
+            job for job in uncompleted_jobs
+            if job.status not in STATUS_FINAL
+        ]
+
+        if not uncompleted_jobs:
             break
 
-    if job.status == Job.FAILED:
-        print("Job failed!")
+    jobs = [stub.GetJob(RequestWithId(id=job.id)) for job in jobs]
 
-    print("result:", json.loads(job.output))
+    if any(job.status == Job.FAILED for job in jobs):
+        print("Job failed!")
+        print(list(job for job in jobs if job.status == Job.FAILED))
+        raise SystemExit(1)
+
+    print("result:", get_result(jobs))
 
 
 if __name__ == '__main__':
+    stub = new_client()
     main()
