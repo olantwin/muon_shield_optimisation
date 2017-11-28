@@ -8,7 +8,7 @@ FIXED_PARAMS = [
 ]
 FIXED_RANGES = [(0, 2), (8, 20)]
 IMAGE = 'olantwin/ship-shield'
-IMAGE_TAG = '20171124.1_T1'  # '20171031_T4' for T4
+IMAGE_TAG = '20171128_T1'  # '20171031_T4' for T4
 RESULTS_TEMPLATE = {
     'error': 'Some',
     'weight': None,

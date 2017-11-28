@@ -157,7 +157,7 @@ def main():
 
     if os.path.exists(heavy):
         tmpl['status'] = 'Too heavy.'
-        tmpl['error'] = 'None.'
+        tmpl['error'] = None
         with open(args.results, 'w') as f:
             json.dump(tmpl, f)
         return
@@ -191,6 +191,7 @@ def main():
                 e
             )
         tmpl['error'] = None
+        tmpl['status'] = 'Done.'
     except RuntimeError, e:
         tmpl['error'] = e.__repr__()
     finally:
