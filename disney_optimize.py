@@ -28,11 +28,13 @@ def WaitCompleteness(jobs):
         time.sleep(SLEEP_TIME)
 
         ids = [job.id for point in jobs for job in point]
-        all_jobs_list = stub.ListJobs(ListJobsRequest())
-        submitted_jobs = [job for job in all_jobs_list.jobs if job.id in ids]
+        uncompleted_jobs = [
+            stub.GetJob(RequestWithId(id=id))
+            for id in ids
+        ]
         jobs_completed = [job.status
                           in STATUS_FINAL
-                          for job in submitted_jobs]
+                          for job in uncompleted_jobs]
         # jobs_completed = [stub.GetJob(RequestWithId(id=job.id)).status
         #                   in STATUS_FINAL
         #                   for point in jobs
@@ -159,6 +161,7 @@ def main():
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
+
     if X and y:
         print('Received previous points ', X, y)
         clf.tell(X, y)
