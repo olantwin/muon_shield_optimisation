@@ -6,7 +6,7 @@ import json
 import base64
 
 import disney_common as common
-from disney_common import get_result
+from disney_oneshot import get_result, CreateJobInput, CreateMetaData
 import config
 
 from skopt import Optimizer
@@ -83,30 +83,6 @@ def ProcessJobs(jobs, space, tag):
         return zip(*results)
     else:
         return [], []
-
-
-def CreateJobInput(point, number):
-    job = copy.deepcopy(config.JOB_TEMPLATE)
-    job['descriptor']['container']['cmd'] = \
-        job['descriptor']['container']['cmd'].format(
-            params=base64.b64encode(str(point).encode('utf8')).decode('utf8'),
-            sampling=37,
-            seed=1,
-            job_id=number+1
-        )
-
-    return json.dumps(job)
-
-
-def CreateMetaData(point, tag, sampling, seed):
-    metadata = copy.deepcopy(config.METADATA_TEMPLATE)
-    metadata['user'].update([
-        ('tag', tag),
-        ('params', str(point)),
-        ('seed', seed),
-        ('sampling', sampling),
-    ])
-    return json.dumps(metadata)
 
 
 STATUS_IN_PROGRESS = set([

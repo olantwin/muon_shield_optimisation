@@ -3,9 +3,6 @@ import hashlib
 import numpy as np
 from skopt.space.space import Integer, Space
 from config import FIXED_PARAMS, FIXED_RANGES
-from disneylandClient import (
-    Job,
-)
 
 
 def FCN(W, Sxi2, L):
@@ -59,31 +56,3 @@ def create_id(params):
     h = hashlib.md5()
     h.update(params_json)
     return h.hexdigest()
-
-
-def get_result(jobs):
-    results = []
-    for job in jobs:
-        if job.status != Job.COMPLETED:
-            raise Exception(
-                "Incomplete job while calculating result: %d",
-                job.id
-            )
-
-        var = [o for o in json.loads(job.output)
-               if o.startswith("variable")][0]
-        result = json.loads(var.split("=", 1)[1])
-        if result['error']:
-            raise Exception(result['error'])
-        results.append(result)
-
-    # Only one job per machine calculates the weight and the length
-    # -> take first we find
-    weight = float([r['weight'] for r in results if r['weight']][0])
-    length = float([r['length'] for r in results if r['length']][0])
-    if weight < 3e6:
-        muons = sum(int(result['muons']) for result in results)
-        muons_w = sum(float(result['muons_w']) for result in results)
-    else:
-        muons, muons_w = None, 0
-    return weight, length, muons, muons_w

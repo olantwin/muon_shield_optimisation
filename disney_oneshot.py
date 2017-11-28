@@ -5,7 +5,6 @@ import base64
 import copy
 import config
 import disney_common as common
-from disney_common import get_result
 
 from disneylandClient import (
     new_client,
@@ -22,6 +21,34 @@ STATUS_FINAL = set([
     Job.COMPLETED,
     Job.FAILED,
 ])
+
+
+def get_result(jobs):
+    results = []
+    for job in jobs:
+        if job.status != Job.COMPLETED:
+            raise Exception(
+                "Incomplete job while calculating result: %d",
+                job.id
+            )
+
+        var = [o for o in json.loads(job.output)
+               if o.startswith("variable")][0]
+        result = json.loads(var.split("=", 1)[1])
+        if result['error']:
+            raise Exception(result['error'])
+        results.append(result)
+
+    # Only one job per machine calculates the weight and the length
+    # -> take first we find
+    weight = float([r['weight'] for r in results if r['weight']][0])
+    length = float([r['length'] for r in results if r['length']][0])
+    if weight < 3e6:
+        muons = sum(int(result['muons']) for result in results)
+        muons_w = sum(float(result['muons_w']) for result in results)
+    else:
+        muons, muons_w = None, 0
+    return weight, length, muons, muons_w
 
 
 def CreateMetaData(point, tag, sampling, seed):
