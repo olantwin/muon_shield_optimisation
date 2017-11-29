@@ -29,8 +29,11 @@ def WaitCompleteness(jobs):
 
         ids = [[job.id for job in point] for point in jobs]
         uncompleted_jobs = [
-            [stub.GetJob(RequestWithId(id=id))
-            for id in point] for point in ids
+            [
+                stub.GetJob(RequestWithId(id=id))
+                for id in point
+            ]
+            for point in ids
         ]
         jobs_completed = [job.status
                           in STATUS_FINAL
