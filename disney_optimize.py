@@ -39,10 +39,6 @@ def WaitCompleteness(jobs):
                           in STATUS_FINAL
                           for point in uncompleted_jobs
                           for job in point]
-        # jobs_completed = [stub.GetJob(RequestWithId(id=job.id)).status
-        #                   in STATUS_FINAL
-        #                   for point in jobs
-        #                   for job in point]
 
         if all(jobs_completed):
             return uncompleted_jobs
@@ -176,9 +172,9 @@ def main():
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
 
         print('Received new points ', X_new, y_new)
-        for i in range(len(X_new)):
-            X_new[i] = common.StripFixedParams(X_new[i])
-            
+
+        X_new = [common.StripFixedParams(point) for point in X_new]
+
         clf.tell(X_new, y_new)
 
 
