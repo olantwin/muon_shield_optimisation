@@ -177,7 +177,7 @@ def main():
 
         print('Received new points ', X_new, y_new)
         for i in range(len(X_new)):
-            X_new = common.StripFixedParams(X_new[i])
+            X_new[i] = common.StripFixedParams(X_new[i])
             
         clf.tell(X_new, y_new)
 
