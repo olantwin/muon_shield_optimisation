@@ -75,21 +75,8 @@ def CreateJobInput(point, number):
     return json.dumps(job)
 
 
-def main():
-    space = common.CreateDiscreteSpace()
-    point = common.AddFixedParams(space.rvs()[0])
-
-    jobs = [
-        stub.CreateJob(Job(
-            input=CreateJobInput(point, i),
-            kind='docker',
-            metadata=CreateMetaData(point, 'test_oneshot', sampling=37, seed=1)
-        ))
-        for i in range(16)
-    ]
+def WaitForCompleteness(jobs):
     uncompleted_jobs = jobs
-
-    print("Job", jobs[0])
 
     while True:
         time.sleep(3)
@@ -113,8 +100,25 @@ def main():
         print("Job failed!")
         print(list(job for job in jobs if job.status == Job.FAILED))
         raise SystemExit(1)
+    return jobs
 
-    print("result:", get_result(jobs))
+
+def main():
+    space = common.CreateDiscreteSpace()
+    point = common.AddFixedParams(space.rvs()[0])
+
+    jobs = [
+        stub.CreateJob(Job(
+            input=CreateJobInput(point, i),
+            kind='docker',
+            metadata=CreateMetaData(point, 'test_oneshot', sampling=37, seed=1)
+        ))
+        for i in range(16)
+    ]
+
+    print("Job", jobs[0])
+
+    print("result:", get_result(WaitForCompleteness(jobs)))
 
 
 if __name__ == '__main__':
