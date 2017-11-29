@@ -113,7 +113,7 @@ def ProcessPoints(disney_points, tag=None):
     y = []
 
     for point in disney_points:
-        if tag == None or json.loads(point.metadata)['user']['tag'] == tag:
+        if tag is None or json.loads(point.metadata)['user']['tag'] == tag:
             try:
                 X.append(ExtractParams(point.metadata))
                 y.append(float(point.output))
