@@ -176,6 +176,9 @@ def main():
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
 
         print('Received new points ', X_new, y_new)
+        for i in range(len(X_new)):
+            X_new = common.StripFixedParams(X_new[i])
+            
         clf.tell(X_new, y_new)
 
 
