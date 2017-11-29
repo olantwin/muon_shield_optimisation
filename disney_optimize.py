@@ -108,12 +108,12 @@ def SubmitDockerJobs(point, tag, sampling, seed):
     ]
 
 
-def ProcessPoints(disney_points, tag):
+def ProcessPoints(disney_points, tag=None):
     X = []
     y = []
 
     for point in disney_points:
-        if json.loads(point.metadata)['user']['tag'] == tag:
+        if tag == None or json.loads(point.metadata)['user']['tag'] == tag:
             try:
                 X.append(ExtractParams(point.metadata))
                 y.append(float(point.output))
@@ -150,7 +150,7 @@ def main():
             for point in points
         ]
 
-        WaitCompleteness(shield_jobs)
+        shield_jobs = WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
