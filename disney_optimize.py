@@ -140,6 +140,7 @@ def main():
 
     if X and y:
         print('Received previous points ', X, y)
+        X = [common.StripFixedParams(point) for point in X]
         clf.tell(X, y)
     if not X or (X and len(X) < POINTS_IN_BATCH):
         points = space.rvs(n_samples=POINTS_IN_BATCH)
@@ -154,6 +155,7 @@ def main():
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
+            X_new = [common.StripFixedParams(point) for point in X_new]
             clf.tell(X_new, y_new)
 
     while True:
