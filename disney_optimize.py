@@ -9,9 +9,6 @@ import disney_common as common
 from disney_oneshot import get_result, CreateJobInput, CreateMetaData
 import config
 
-from skopt import Optimizer
-from skopt.learning import RandomForestRegressor
-
 import disneylandClient
 from disneylandClient import (
     Job,
@@ -19,11 +16,19 @@ from disneylandClient import (
     ListJobsRequest
 )
 
+from sklearn.ensemble import GradientBoostingRegressor
+from skopt import Optimizer
+from skopt.learning import GaussianProcessRegressor
+from skopt.learning import RandomForestRegressor
+from skopt.learning import GradientBoostingQuantileRegressor
+
 SLEEP_TIME = 60  # seconds
-POINTS_IN_BATCH = 1
+POINTS_IN_BATCH = 15
 
 
 def WaitCompleteness(jobs):
+
+    work_time = 0
     while True:
         time.sleep(SLEEP_TIME)
 
@@ -44,6 +49,16 @@ def WaitCompleteness(jobs):
             return uncompleted_jobs
 
         print("[{}] Waiting...".format(time.time()))
+        work_time += 60
+
+        if work_time > 60 * 60 * 3:
+            completed_jobs = []
+            for point in uncompleted_jobs:
+                if all([job.status in STATUS_FINAL for job in point]):
+                    completed_jobs.append(point)
+
+            return completed_jobs
+    
 
 
 def ExtractParams(metadata):
@@ -130,10 +145,33 @@ def main():
     tag = f'discrete3_{clf_type}'
 
     space = common.CreateDiscreteSpace()
-    clf = Optimizer(
-        space,
-        RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
-    ) if clf_type == 'rf' else None
+    if clf_type == 'rf':
+        clf = Optimizer(
+            space,
+            RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
+        )
+    elif clf_type == 'gb':
+        clf = Optimizer(
+            space,
+            GradientBoostingQuantileRegressor(
+                base_estimator=GradientBoostingRegressor(
+                    n_estimators=100,
+                    max_depth=4,
+                    loss='quantile'
+                )
+            )
+        )
+    else:
+        clf = Optimizer(
+            space,
+            GaussianProcessRegressor(
+                alpha=1e-7,
+                normalize_y=True,
+                noise='gaussian'
+            )
+        )
+
+
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
