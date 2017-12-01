@@ -123,12 +123,12 @@ def SubmitDockerJobs(point, tag, sampling, seed):
     ]
 
 
-def ProcessPoints(disney_points, tag=None):
+def ProcessPoints(disney_points, tag):
     X = []
     y = []
 
     for point in disney_points:
-        if tag is None or json.loads(point.metadata)['user']['tag'] == tag:
+        if tag == 'all' or json.loads(point.metadata)['user']['tag'] == tag:
             try:
                 X.append(ExtractParams(point.metadata))
                 y.append(float(point.output))
@@ -170,8 +170,6 @@ def main():
                 noise='gaussian'
             )
         )
-
-
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
