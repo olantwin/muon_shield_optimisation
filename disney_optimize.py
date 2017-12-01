@@ -23,7 +23,7 @@ from skopt.learning import RandomForestRegressor
 from skopt.learning import GradientBoostingQuantileRegressor
 
 SLEEP_TIME = 60  # seconds
-POINTS_IN_BATCH = 15
+POINTS_IN_BATCH = 1
 
 class RandomSearchOptimizer:
     def __init__(self, space):
@@ -186,7 +186,7 @@ def main():
     parser.add_argument('-tag', help='Write tag', default='')
     clf_type = parser.parse_args().opt
     additional_tag = parser.parse_args().tag
-    tag = f'discrete3_{clf_type}_{additional_tag}'
+    tag = f'mitesh_1d_{clf_type}_{additional_tag}'
 
     space = common.CreateDiscreteSpace()
 
