@@ -5,7 +5,6 @@ import base64
 import copy
 import config
 import disney_common as common
-
 from disneylandClient import (
     new_client,
     Job,
@@ -21,6 +20,30 @@ STATUS_FINAL = set([
     Job.COMPLETED,
     Job.FAILED,
 ])
+
+
+def ProcessPoint(jobs, space, tag):
+    if json.loads(jobs[0].metadata)['user']['tag'] == tag:
+        try:
+            weight, length, _, muons_w = get_result(jobs)
+            y = common.FCN(weight, muons_w, length)
+            X = ExtractParams(jobs[0].metadata)
+
+            stub.CreateJob(Job(
+                input='',
+                output=str(y),
+                kind='point',
+                metadata=jobs[0].metadata
+            ))
+            print(X, y)
+            return X, y
+        except Exception as e:
+            print(e)
+
+
+def ExtractParams(metadata):
+    params = json.loads(metadata)['user']['params']
+    return common.ParseParams(params)
 
 
 def get_result(jobs):
@@ -104,6 +127,7 @@ def WaitForCompleteness(jobs):
 
 
 def main():
+    tag = 'test_oneshot'
     space = common.CreateDiscreteSpace()
     point = common.AddFixedParams(space.rvs()[0])
 
@@ -111,14 +135,14 @@ def main():
         stub.CreateJob(Job(
             input=CreateJobInput(point, i),
             kind='docker',
-            metadata=CreateMetaData(point, 'test_oneshot', sampling=37, seed=1)
+            metadata=CreateMetaData(point, tag, sampling=37, seed=1)
         ))
         for i in range(16)
     ]
 
     print("Job", jobs[0])
 
-    print("result:", get_result(WaitForCompleteness(jobs)))
+    print("result:", ProcessPoint(WaitForCompleteness(jobs), space, tag))
 
 
 if __name__ == '__main__':

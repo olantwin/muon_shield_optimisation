@@ -165,12 +165,12 @@ def SubmitDockerJobs(point, tag, sampling, seed):
     ]
 
 
-def ProcessPoints(disney_points, tag=None):
+def ProcessPoints(disney_points, tag):
     X = []
     y = []
 
     for point in disney_points:
-        if tag is None or json.loads(point.metadata)['user']['tag'] == tag:
+        if tag == 'all' or json.loads(point.metadata)['user']['tag'] == tag:
             try:
                 X.append(ExtractParams(point.metadata))
                 y.append(float(point.output))
@@ -189,6 +189,7 @@ def main():
     tag = f'discrete3_{clf_type}_{additional_tag}'
 
     space = common.CreateDiscreteSpace()
+
     clf = CreateOptimizer(clf_type, space)
 
 
