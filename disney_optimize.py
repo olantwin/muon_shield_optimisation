@@ -25,6 +25,48 @@ from skopt.learning import GradientBoostingQuantileRegressor
 SLEEP_TIME = 60  # seconds
 POINTS_IN_BATCH = 15
 
+class RandomSearchOptimizer:
+    def __init__(self, space):
+        self.space_ = space
+    
+    def tell(self, X, y):
+        pass
+    
+    def ask(self, n_points=1, strategy=None):
+        return self.space_.rvs(n_points)
+
+
+def CreateOptimizer(clf_type, space):
+    if clf_type == 'rf':
+        clf = Optimizer(
+            space,
+            RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
+        )
+    elif clf_type == 'gb':
+        clf = Optimizer(
+            space,
+            GradientBoostingQuantileRegressor(
+                base_estimator=GradientBoostingRegressor(
+                    n_estimators=100,
+                    max_depth=4,
+                    loss='quantile'
+                )
+            )
+        )
+    elif clf_type == 'gp':
+        clf = Optimizer(
+            space,
+            GaussianProcessRegressor(
+                alpha=1e-7,
+                normalize_y=True,
+                noise='gaussian'
+            )
+        )
+    else:
+        clf = RandomSearchOptimizer(space)
+    
+    return clf
+
 
 def WaitCompleteness(jobs):
 
@@ -141,36 +183,13 @@ def ProcessPoints(disney_points, tag=None):
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
     parser.add_argument('-opt', help='Write an optimizer.', default='rf')
+    parser.add_argument('-tag', help='Write tag', default='')
     clf_type = parser.parse_args().opt
-    tag = f'discrete3_{clf_type}'
+    additional_tag = parser.parse_args().tag
+    tag = f'discrete3_{clf_type}_{additional_tag}'
 
     space = common.CreateDiscreteSpace()
-    if clf_type == 'rf':
-        clf = Optimizer(
-            space,
-            RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1)
-        )
-    elif clf_type == 'gb':
-        clf = Optimizer(
-            space,
-            GradientBoostingQuantileRegressor(
-                base_estimator=GradientBoostingRegressor(
-                    n_estimators=100,
-                    max_depth=4,
-                    loss='quantile'
-                )
-            )
-        )
-    else:
-        clf = Optimizer(
-            space,
-            GaussianProcessRegressor(
-                alpha=1e-7,
-                normalize_y=True,
-                noise='gaussian'
-            )
-        )
-
+    clf = CreateOptimizer(clf_type, space)
 
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000))
