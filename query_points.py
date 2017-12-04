@@ -10,10 +10,16 @@ stub = new_client()
 all_jobs = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000)).jobs
 X, y = ProcessPoints(all_jobs, tag='all')
 ids = [job.id for job in all_jobs]
-tags = [json.loads(point.metadata)['user']['tag'] for point in all_jobs]
-df = pd.DataFrame(
+metadata = pd.DataFrame.from_dict(
+    data=[
+        json.loads(
+            point.metadata)['user'] for point in all_jobs]).drop(
+                'params',
+    axis=1)
+data = pd.DataFrame(
     data=np.concatenate(
-        [np.array(X).T, np.array([y]), np.array([ids]), np.array([tags])]).T,
-    columns=list(range(1, 57)) + ['loss', 'job_id', 'tag'])
+        [np.array(X).T, np.array([y]), np.array([ids])]).T,
+    columns=list(range(1, 57)) + ['loss', 'job_id'])
+df = pd.concat([data, metadata], axis=1)
 df.to_csv('points.csv')
 print(df)
