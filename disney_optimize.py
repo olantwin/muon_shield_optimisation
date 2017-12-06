@@ -193,7 +193,7 @@ def main():
     clf = CreateOptimizer(clf_type, space)
 
 
-    all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000))
+    all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=100000))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
 
     if X and y:

@@ -7,7 +7,7 @@ from disneylandClient import ListJobsRequest, new_client
 from disney_optimize import ProcessPoints
 
 stub = new_client()
-all_jobs = stub.ListJobs(ListJobsRequest(kind='point', how_many=1000)).jobs
+all_jobs = stub.ListJobs(ListJobsRequest(kind='point', how_many=100000)).jobs
 X, y = ProcessPoints(all_jobs, tag='all')
 ids = [job.id for job in all_jobs]
 metadata = pd.DataFrame.from_dict(
