@@ -71,7 +71,7 @@ DEFAULT_POINT = [
 FIXED_RANGES = [(0, 2), (8, 20)]
 FIXED_PARAMS = StripFreeParams(DEFAULT_POINT)
 IMAGE = 'olantwin/ship-shield'
-IMAGE_TAG = '20171129_T1'  # '20171128_T4' for T4
+IMAGE_TAG = '20171207_T1'  # '20171128_T4' for T4
 RESULTS_TEMPLATE = {
     'error': 'Some',
     'weight': None,
@@ -127,3 +127,6 @@ METADATA_TEMPLATE = {
     },
     'disney': {}
 }
+
+RUN = "discrete4"
+POINTS_IN_BATCH = 20

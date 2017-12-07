@@ -8,6 +8,7 @@ import base64
 import disney_common as common
 from disney_oneshot import get_result, CreateJobInput, CreateMetaData
 import config
+from config import RUN, POINTS_IN_BATCH
 
 import disneylandClient
 from disneylandClient import (
@@ -23,7 +24,6 @@ from skopt.learning import RandomForestRegressor
 from skopt.learning import GradientBoostingQuantileRegressor
 
 SLEEP_TIME = 60  # seconds
-POINTS_IN_BATCH = 15
 
 class RandomSearchOptimizer:
     def __init__(self, space):
@@ -186,7 +186,7 @@ def main():
     parser.add_argument('-tag', help='Write tag', default='')
     clf_type = parser.parse_args().opt
     additional_tag = parser.parse_args().tag
-    tag = f'discrete3_{clf_type}_{additional_tag}'
+    tag = f'{RUN}_{clf_type}_{additional_tag}'
 
     space = common.CreateDiscreteSpace()
 
