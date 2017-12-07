@@ -82,41 +82,39 @@ RESULTS_TEMPLATE = {
     'status': None,
 }
 JOB_TEMPLATE = {
-    'descriptor': {
-        'input': [],
-        'container': {
-            'workdir':
-            '',
-            'name':
-            '{}:{}'.format(IMAGE, IMAGE_TAG),
-            'volumes': [
-                '/home/sashab1/ship-shield:/shield',
-                '/home/sashab1/ship/shared:/shared'
-            ],
-            'cpu_needed':
-            1,
-            'max_memoryMB':
-            1024,
-            'min_memoryMB':
-            512,
-            'run_id':
-            'near_run3',
-            'cmd':
-            '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh; '''
-            '''python2 /code/slave.py '''
-            '''--params {params} '''
-            '''-f /shield/worker_files/sampling_{sampling}/'''
-            '''muons_{job_id}_16.root '''
-            '''--results /output/result.json '''
-            '''--hists /output/hists.root --seed {seed}' ''',
-        },
-        'required_outputs': {
-            'output_uri': 'host:/srv/local/skygrid-local-storage/$JOB_ID',
-            'file_contents': [{
-                'file': 'result.json',
-                'to_variable': 'result'
-            }]
-        }
+    'input': [],
+    'container': {
+        'workdir':
+        '',
+        'name':
+        '{}:{}'.format(IMAGE, IMAGE_TAG),
+        'volumes': [
+            '/home/sashab1/ship-shield:/shield',
+            '/home/sashab1/ship/shared:/shared'
+        ],
+        'cpu_needed':
+        1,
+        'max_memoryMB':
+        1024,
+        'min_memoryMB':
+        512,
+        'run_id':
+        'near_run3',
+        'cmd':
+        '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh; '''
+        '''python2 /code/slave.py '''
+        '''--params {params} '''
+        '''-f /shield/worker_files/sampling_{sampling}/'''
+        '''muons_{job_id}_16.root '''
+        '''--results /output/result.json '''
+        '''--hists /output/hists.root --seed {seed}' ''',
+    },
+    'required_outputs': {
+        'output_uri': 'host:/srv/local/skygrid-local-storage/$JOB_ID',
+        'file_contents': [{
+            'file': 'result.json',
+            'to_variable': 'result'
+        }]
     }
 }
 METADATA_TEMPLATE = {

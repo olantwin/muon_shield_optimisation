@@ -20,24 +20,22 @@ STATUS_FINAL = set([
 ])
 
 descriptor = {
-    "descriptor": {
-        "input": [],
+    "input": [],
 
-        "container": {
-            "workdir": "",
-            "name": f"{IMAGE}:{IMAGE_TAG}",
-            "cpu_needed": 1,
-            "max_memoryMB": 1024,
-            "min_memoryMB": 512,
-            "cmd": "sh -lc 'echo 123 > /output/test.txt'",
-        },
+    "container": {
+        "workdir": "",
+        "name": f"{IMAGE}:{IMAGE_TAG}",
+        "cpu_needed": 1,
+        "max_memoryMB": 1024,
+        "min_memoryMB": 512,
+        "cmd": "sh -lc 'echo 123 > /output/test.txt'",
+    },
 
-        "required_outputs": {
-            "output_uri": "none:",
-            "file_contents": [
-                {"file": "test.txt", "to_variable": "out"}
-            ]
-        }
+    "required_outputs": {
+        "output_uri": "none:",
+        "file_contents": [
+            {"file": "test.txt", "to_variable": "out"}
+        ]
     }
 }
 

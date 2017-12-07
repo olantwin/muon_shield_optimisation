@@ -87,8 +87,8 @@ def CreateMetaData(point, tag, sampling, seed):
 
 def CreateJobInput(point, number):
     job = copy.deepcopy(config.JOB_TEMPLATE)
-    job['descriptor']['container']['cmd'] = \
-        job['descriptor']['container']['cmd'].format(
+    job['container']['cmd'] = \
+        job['container']['cmd'].format(
             params=base64.b64encode(str(point).encode('utf8')).decode('utf8'),
             sampling=37,
             seed=1,
