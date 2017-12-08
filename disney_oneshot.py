@@ -4,6 +4,7 @@ import json
 import base64
 import copy
 import config
+from config import RUN
 import disney_common as common
 from disneylandClient import (
     new_client,
@@ -127,7 +128,7 @@ def WaitForCompleteness(jobs):
 
 
 def main():
-    tag = 'test_oneshot'
+    tag = f'{RUN}_oneshot'
     space = common.CreateDiscreteSpace()
     point = common.AddFixedParams(space.rvs()[0])
 
