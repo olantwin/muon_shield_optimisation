@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 set -eux
 source /opt/FairShipRun/config.sh
 JOBID=$1

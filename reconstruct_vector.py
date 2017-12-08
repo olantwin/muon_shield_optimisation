@@ -1,4 +1,4 @@
-#!/bin/env python2
+#!/usr/bin/env python2
 from array import array
 import click
 from rootpy.io import root_open
