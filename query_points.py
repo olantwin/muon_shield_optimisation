@@ -20,6 +20,6 @@ data = pd.DataFrame(
     data=np.concatenate(
         [np.array(X).T, np.array([y]), np.array([ids])]).T,
     columns=list(range(1, 57)) + ['loss', 'job_id'])
-df = pd.concat([data, metadata], axis=1)
+df = pd.concat([data, metadata], axis=1).set_index(['job_id']).sort_index()
 df.to_csv('points.csv')
 print(df)
