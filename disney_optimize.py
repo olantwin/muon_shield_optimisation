@@ -6,9 +6,17 @@ import json
 import base64
 
 import disney_common as common
-from disney_oneshot import get_result, CreateJobInput, CreateMetaData
+from disney_oneshot import (
+    get_result,
+    CreateJobInput,
+    CreateMetaData,
+    ExtractParams,
+    ProcessPoint,
+    STATUS_IN_PROCESS,
+    STATUS_FINAL
+)
 import config
-from config import RUN, POINTS_IN_BATCH
+from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS
 
 import disneylandClient
 from disneylandClient import (
@@ -25,13 +33,14 @@ from skopt.learning import GradientBoostingQuantileRegressor
 
 SLEEP_TIME = 60  # seconds
 
+
 class RandomSearchOptimizer:
     def __init__(self, space):
         self.space_ = space
-    
+
     def tell(self, X, y):
         pass
-    
+
     def ask(self, n_points=1, strategy=None):
         return self.space_.rvs(n_points)
 
@@ -64,7 +73,7 @@ def CreateOptimizer(clf_type, space):
         )
     else:
         clf = RandomSearchOptimizer(space)
-    
+
     return clf
 
 
@@ -100,31 +109,6 @@ def WaitCompleteness(jobs):
                     completed_jobs.append(point)
 
             return completed_jobs
-    
-
-
-def ExtractParams(metadata):
-    params = json.loads(metadata)['user']['params']
-    return common.ParseParams(params)
-
-
-def ProcessPoint(jobs, space, tag):
-    if json.loads(jobs[0].metadata)['user']['tag'] == tag:
-        try:
-            weight, length, _, muons_w = get_result(jobs)
-            y = common.FCN(weight, muons_w, length)
-            X = ExtractParams(jobs[0].metadata)
-
-            stub.CreateJob(Job(
-                input='',
-                output=str(y),
-                kind='point',
-                metadata=jobs[0].metadata
-            ))
-            print(X, y)
-            return X, y
-        except Exception as e:
-            print(e)
 
 
 def ProcessJobs(jobs, space, tag):
@@ -140,16 +124,6 @@ def ProcessJobs(jobs, space, tag):
     else:
         return [], []
 
-
-STATUS_IN_PROGRESS = set([
-    Job.PENDING,
-    Job.PULLED,
-    Job.RUNNING,
-])
-STATUS_FINAL = set([
-    Job.COMPLETED,
-    Job.FAILED,
-])
 
 stub = disneylandClient.new_client()
 
@@ -192,7 +166,6 @@ def main():
 
     clf = CreateOptimizer(clf_type, space)
 
-
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=100000))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
 
@@ -200,7 +173,7 @@ def main():
         print('Received previous points ', X, y)
         X = [common.StripFixedParams(point) for point in X]
         clf.tell(X, y)
-    if not X or (X and len(X) < POINTS_IN_BATCH):
+    while not (X and len(X) > RANDOM_STARTS):
         points = space.rvs(n_samples=POINTS_IN_BATCH)
         points = [common.AddFixedParams(p) for p in points]
 
