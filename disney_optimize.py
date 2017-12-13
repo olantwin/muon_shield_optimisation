@@ -172,7 +172,11 @@ def main():
 
     space = common.CreateDiscreteSpace()
 
-    clf = CreateOptimizer(args.opt, space, random_state=int(args.state))
+    clf = CreateOptimizer(
+        args.opt,
+        space,
+        random_state=int(args.state) if args.state else None
+    )
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=0))
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
