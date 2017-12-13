@@ -11,7 +11,6 @@ from disney_oneshot import (
     CreateJobInput,
     CreateMetaData,
     ExtractParams,
-    ProcessPoint,
     STATUS_IN_PROCESS,
     STATUS_FINAL
 )
@@ -32,6 +31,27 @@ from skopt.learning import RandomForestRegressor
 from skopt.learning import GradientBoostingQuantileRegressor
 
 SLEEP_TIME = 60  # seconds
+
+
+def ProcessPoint(jobs, space, tag):
+    if json.loads(jobs[0].metadata)['user']['tag'] == tag:
+        try:
+            weight, length, _, muons_w = get_result(jobs)
+            y = common.FCN(weight, muons_w, length)
+            X = ExtractParams(jobs[0].metadata)
+
+            stub.CreateJob(Job(
+                input='',
+                output=str(y),
+                kind='point',
+                metadata=jobs[0].metadata
+            ))
+            # TODO modify original jobs to mark them as processed,
+            # job_id of point
+            print(X, y)
+            return X, y
+        except Exception as e:
+            print(e)
 
 
 class RandomSearchOptimizer:
