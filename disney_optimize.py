@@ -182,10 +182,7 @@ def main():
         X = [common.StripFixedParams(point) for point in X]
         clf.tell(X, y)
     while not (X and len(X) > RANDOM_STARTS):
-        points = space.rvs(
-            n_samples=POINTS_IN_BATCH,
-            random_state=int(args.state)
-        )
+        points = space.rvs(n_samples=POINTS_IN_BATCH)
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
