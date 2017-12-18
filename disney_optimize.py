@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import base64
+import pickle
 
 import disney_common as common
 from disney_oneshot import (
@@ -198,7 +199,10 @@ def main():
         random_state=int(args.state) if args.state else None
     )
 
+    # TODO use random points for init, don't tag them with optimiser
+
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=0))
+    # TODO request multiple tags
     X, y = ProcessPoints(all_jobs_list.jobs, tag)
 
     if X and y:
@@ -211,6 +215,7 @@ def main():
 
         shield_jobs = [
             SubmitDockerJobs(point, tag, sampling=37, seed=1)
+            # TODO change tag
             for point in points
         ]
 
@@ -241,6 +246,9 @@ def main():
         X_new = [common.StripFixedParams(point) for point in X_new]
 
         clf.tell(X_new, y_new)
+
+        with open('optimiser.pkl', 'wb') as f:
+            pickle.dump(clf, f)
 
 
 if __name__ == '__main__':
