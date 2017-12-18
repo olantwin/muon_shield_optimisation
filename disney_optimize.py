@@ -245,10 +245,13 @@ def main():
 
         X_new = [common.StripFixedParams(point) for point in X_new]
 
-        clf.tell(X_new, y_new)
+        result = clf.tell(X_new, y_new)
 
         with open('optimiser.pkl', 'wb') as f:
             pickle.dump(clf, f)
+
+        with open('result.pkl', 'wb') as f:
+            pickle.dump(result, f)
 
 
 if __name__ == '__main__':
