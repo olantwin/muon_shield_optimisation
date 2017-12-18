@@ -27,9 +27,11 @@ from disneylandClient import (
 
 from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
-from skopt.learning import GaussianProcessRegressor
-from skopt.learning import RandomForestRegressor
-from skopt.learning import GradientBoostingQuantileRegressor
+from skopt.learning import (
+    GaussianProcessRegressor,
+    RandomForestRegressor,
+    GradientBoostingQuantileRegressor
+)
 
 SLEEP_TIME = 60  # seconds
 
@@ -53,18 +55,6 @@ def ProcessPoint(jobs, space, tag):
             return X, y
         except Exception as e:
             print(e)
-
-
-class RandomSearchOptimizer:
-    def __init__(self, space, random_state=None):
-        self.space_ = space
-        self.state_ = random_state
-
-    def tell(self, X, y):
-        pass
-
-    def ask(self, n_points=1, strategy=None):
-        return self.space_.rvs(n_points, random_state=self.state_)
 
 
 def CreateOptimizer(clf_type, space, random_state=None):
@@ -97,7 +87,11 @@ def CreateOptimizer(clf_type, space, random_state=None):
             random_state=random_state
         )
     else:
-        clf = RandomSearchOptimizer(space, random_state=random_state)
+        clf = Optimizer(
+            space,
+            base_estimator='dummy',
+            random_state=random_state
+        )
 
     return clf
 
