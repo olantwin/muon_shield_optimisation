@@ -3,6 +3,7 @@ import time
 import json
 import base64
 import copy
+import argparse
 import config
 from config import RUN
 import disney_common as common
@@ -23,7 +24,7 @@ STATUS_FINAL = set([
 ])
 
 
-def ProcessPoint(jobs, space, tag):
+def ProcessPoint(jobs, tag):
     if json.loads(jobs[0].metadata)['user']['tag'] == tag:
         try:
             weight, length, _, muons_w = get_result(jobs)
@@ -88,13 +89,13 @@ def CreateMetaData(point, tag, sampling, seed):
     return json.dumps(metadata)
 
 
-def CreateJobInput(point, number):
+def CreateJobInput(point, number, sampling, seed):
     job = copy.deepcopy(config.JOB_TEMPLATE)
     job['container']['cmd'] = \
         job['container']['cmd'].format(
             params=base64.b64encode(str(point).encode('utf8')).decode('utf8'),
-            sampling=37,
-            seed=1,
+            sampling=sampling,
+            seed=seed,
             job_id=number+1
         )
 
@@ -140,14 +141,14 @@ def main():
     args = parser.parse_args()
     tag = f'{RUN}_oneshot'
     if args.point:
-        point = args.point
+        point = common.ParseParams(args.point)
     else:
         space = common.CreateDiscreteSpace()
         point = common.AddFixedParams(space.rvs()[0])
 
     jobs = [
         stub.CreateJob(Job(
-            input=CreateJobInput(point, i),
+            input=CreateJobInput(point, i, sampling=37, seed=args.seed),
             kind='docker',
             metadata=CreateMetaData(point, tag, sampling=37, seed=args.seed)
         ))
@@ -156,7 +157,7 @@ def main():
 
     print("Job", jobs[0])
 
-    print("result:", ProcessPoint(WaitForCompleteness(jobs), space, tag))
+    print("result:", ProcessPoint(WaitForCompleteness(jobs), tag))
 
 
 if __name__ == '__main__':
