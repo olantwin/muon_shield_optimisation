@@ -136,7 +136,7 @@ def main():
     parser.add_argument(
         '--seed',
         help='Random seed of simulation',
-        default=None
+        default=1
     )
     args = parser.parse_args()
     tag = f'{RUN}_oneshot'
