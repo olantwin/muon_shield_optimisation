@@ -36,6 +36,8 @@ def ProcessPoint(jobs, space, tag):
                 kind='point',
                 metadata=jobs[0].metadata
             ))
+            # TODO modify original jobs to mark them as processed,
+            # job_id of point
             print(X, y)
             return X, y
         except Exception as e:
@@ -128,15 +130,26 @@ def WaitForCompleteness(jobs):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Start optimizer.')
+    parser.add_argument('-p', '--point', default=None)
+    parser.add_argument(
+        '--seed',
+        help='Random seed of simulation',
+        default=None
+    )
+    args = parser.parse_args()
     tag = f'{RUN}_oneshot'
-    space = common.CreateDiscreteSpace()
-    point = common.AddFixedParams(space.rvs()[0])
+    if args.point:
+        point = args.point
+    else:
+        space = common.CreateDiscreteSpace()
+        point = common.AddFixedParams(space.rvs()[0])
 
     jobs = [
         stub.CreateJob(Job(
             input=CreateJobInput(point, i),
             kind='docker',
-            metadata=CreateMetaData(point, tag, sampling=37, seed=1)
+            metadata=CreateMetaData(point, tag, sampling=37, seed=args.seed)
         ))
         for i in range(16)
     ]
