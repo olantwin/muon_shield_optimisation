@@ -4,14 +4,14 @@ import json
 import base64
 import copy
 import argparse
-import config
-from config import RUN
-import disney_common as common
 from disneylandClient import (
     new_client,
     Job,
     RequestWithId,
 )
+import config
+from config import RUN
+import disney_common as common
 
 STATUS_IN_PROCESS = set([
     Job.PENDING,
@@ -43,6 +43,7 @@ def ProcessPoint(jobs, tag):
             return X, y
         except Exception as e:
             print(e)
+            raise
 
 
 def ExtractParams(metadata):
