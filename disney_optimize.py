@@ -1,22 +1,8 @@
 #!/usr/bin/env python3
 import time
 import argparse
-import copy
 import json
-import base64
 import pickle
-
-import disney_common as common
-from disney_oneshot import (
-    get_result,
-    CreateJobInput,
-    CreateMetaData,
-    ExtractParams,
-    STATUS_IN_PROCESS,
-    STATUS_FINAL
-)
-import config
-from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS
 
 import disneylandClient
 from disneylandClient import (
@@ -33,10 +19,21 @@ from skopt.learning import (
     GradientBoostingQuantileRegressor
 )
 
+import disney_common as common
+from disney_oneshot import (
+    get_result,
+    CreateJobInput,
+    CreateMetaData,
+    ExtractParams,
+    STATUS_FINAL
+)
+import config
+from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS
+
 SLEEP_TIME = 60  # seconds
 
 
-def ProcessPoint(jobs, space, tag):
+def ProcessPoint(jobs, tag):
     if json.loads(jobs[0].metadata)['user']['tag'] == tag:
         try:
             weight, length, _, muons_w = get_result(jobs)
@@ -118,7 +115,7 @@ def WaitCompleteness(jobs):
         if all(jobs_completed):
             return uncompleted_jobs
 
-        print("[{}] Waiting...".format(time.time()))
+        print('[{}] Waiting...'.format(time.time()))
         work_time += 60
 
         if work_time > 60 * 60 * 3:
@@ -130,18 +127,15 @@ def WaitCompleteness(jobs):
             return completed_jobs
 
 
-def ProcessJobs(jobs, space, tag):
-    print("[{}] Processing jobs...".format(time.time()))
+def ProcessJobs(jobs, tag):
+    print('[{}] Processing jobs...'.format(time.time()))
     results = [
-        ProcessPoint(point, space, tag)
+        ProcessPoint(point, tag)
         for point in jobs
     ]
-    print(f"Got results {results}")
+    print(f'Got results {results}')
     results = [result for result in results if result]
-    if results:
-        return zip(*results)
-    else:
-        return [], []
+    return zip(*results) if results else ([], [])
 
 
 stub = disneylandClient.new_client()
@@ -158,19 +152,33 @@ def SubmitDockerJobs(point, tag, sampling, seed):
     ]
 
 
-def ProcessPoints(disney_points, tag):
+def ProcessPoints(points):
     X = []
     y = []
 
-    for point in disney_points:
-        if tag == 'all' or json.loads(point.metadata)['user']['tag'] == tag:
-            try:
-                X.append(ExtractParams(point.metadata))
-                y.append(float(point.output))
-            except Exception as e:
-                print(e)
+    for point in points:
+        try:
+            X.append(ExtractParams(point.metadata))
+            y.append(float(point.output))
+        except Exception as e:
+            print(e)
 
     return X, y
+
+
+def FilterPoints(points, seed, sampling,
+                 image_tag=config.IMAGE_TAG, tag='all'):
+    filtered = []
+    for point in points:
+        metadata = json.loads(point.metadata)['user']
+        if (
+                (tag == 'all' or metadata['tag'] == tag)
+                and metadata['image_tag'] == image_tag
+                and (metadata['seed'] == seed or seed == 'all')
+                and (metadata['sampling'] == sampling or sampling == 'all')
+        ):
+            filtered.append(point)
+    return filtered
 
 
 def main():
@@ -187,6 +195,10 @@ def main():
         help='Random seed of simulation',
         default=1
     )
+    parser.add_argument(
+        '--sampling',
+        default=37
+    )
     args = parser.parse_args()
     tag = f'{RUN}_{args.opt}' + '_{args.tag}' if args.tag else ''
 
@@ -202,7 +214,9 @@ def main():
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=0))
     # TODO request multiple tags
-    X, y = ProcessPoints(all_jobs_list.jobs, tag)
+    X, y = ProcessPoints(
+        FilterPoints(
+            all_jobs_list.jobs, tag=tag, seed=args.seed, sampling=args.sampling))
 
     if X and y:
         print('Received previous points ', X, y)
@@ -213,13 +227,17 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            SubmitDockerJobs(point, tag, sampling=37, seed=args.seed)
+            SubmitDockerJobs(
+                point,
+                tag,
+                sampling=args.sampling,
+                seed=args.seed)
             # TODO change tag
             for point in points
         ]
 
         shield_jobs = WaitCompleteness(shield_jobs)
-        X_new, y_new = ProcessJobs(shield_jobs, space, tag)
+        X_new, y_new = ProcessJobs(shield_jobs, tag)
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
             X_new = [common.StripFixedParams(point) for point in X_new]
@@ -233,12 +251,16 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            SubmitDockerJobs(point, tag, sampling=37, seed=args.seed)
+            SubmitDockerJobs(
+                point,
+                tag,
+                sampling=args.sampling,
+                seed=args.seed)
             for point in points
         ]
 
         shield_jobs = WaitCompleteness(shield_jobs)
-        X_new, y_new = ProcessJobs(shield_jobs, space, tag)
+        X_new, y_new = ProcessJobs(shield_jobs, tag)
 
         print('Received new points ', X_new, y_new)
 
