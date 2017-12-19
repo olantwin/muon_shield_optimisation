@@ -150,7 +150,7 @@ stub = disneylandClient.new_client()
 def SubmitDockerJobs(point, tag, sampling, seed):
     return [
         stub.CreateJob(Job(
-            input=CreateJobInput(point, i),
+            input=CreateJobInput(point, i, sampling=sampling, seed=seed),
             kind='docker',
             metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
         ))
@@ -182,6 +182,11 @@ def main():
         help='Random state of Optimizer',
         default=None
     )
+    parser.add_argument(
+        '--seed',
+        help='Random seed of simulation',
+        default=1
+    )
     args = parser.parse_args()
     tag = f'{RUN}_{args.opt}' + '_{args.tag}' if args.tag else ''
 
@@ -208,7 +213,7 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            SubmitDockerJobs(point, tag, sampling=37, seed=1)
+            SubmitDockerJobs(point, tag, sampling=37, seed=args.seed)
             # TODO change tag
             for point in points
         ]
@@ -228,7 +233,7 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            SubmitDockerJobs(point, tag, sampling=37, seed=1)
+            SubmitDockerJobs(point, tag, sampling=37, seed=args.seed)
             for point in points
         ]
 
