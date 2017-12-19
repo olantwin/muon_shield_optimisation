@@ -25,6 +25,7 @@ from disney_oneshot import (
     CreateJobInput,
     CreateMetaData,
     ExtractParams,
+    WaitForCompleteness,
     STATUS_FINAL
 )
 import config
@@ -200,7 +201,7 @@ def main():
         default=37
     )
     args = parser.parse_args()
-    tag = f'{RUN}_{args.opt}' + '_{args.tag}' if args.tag else ''
+    tag = f'{RUN}_{args.opt}' + f'_{args.tag}' if args.tag else ''
 
     space = common.CreateDiscreteSpace()
 

@@ -103,7 +103,7 @@ def CreateJobInput(point, number, sampling, seed):
     return json.dumps(job)
 
 
-def WaitForCompleteness(jobs):
+def WaitForCompleteness(jobs, verbose=False):
     uncompleted_jobs = jobs
 
     while True:
@@ -112,7 +112,10 @@ def WaitForCompleteness(jobs):
             stub.GetJob(RequestWithId(id=job.id))
             for job in uncompleted_jobs
         ]
-        print("[{}] Job :\n {}\n".format(time.time(), uncompleted_jobs[0]))
+        if verbose:
+            print("[{}] Job :\n {}\n".format(time.time(), uncompleted_jobs[0]))
+        else:
+            print("[{}] Waiting...".format(time.time()))
 
         uncompleted_jobs = [
             job for job in uncompleted_jobs
@@ -158,7 +161,7 @@ def main():
 
     print("Job", jobs[0])
 
-    print("result:", ProcessPoint(WaitForCompleteness(jobs), tag))
+    print("result:", ProcessPoint(WaitForCompleteness(jobs, verbose=True), tag))
 
 
 if __name__ == '__main__':
