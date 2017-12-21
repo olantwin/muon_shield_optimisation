@@ -44,6 +44,7 @@ def ProcessPoint(jobs, tag):
         except Exception as e:
             print(e)
             raise
+    return [], []
 
 
 def ExtractParams(metadata):
@@ -134,6 +135,22 @@ def WaitForCompleteness(jobs, verbose=False):
     return jobs
 
 
+def CalculatePoint(point, seed, sampling, tag, verbose=False):
+    jobs = [
+        stub.CreateJob(Job(
+            input=CreateJobInput(point, i, sampling=sampling, seed=seed),
+            kind='docker',
+            metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
+        ))
+        for i in range(16)
+    ]
+
+    if verbose:
+        print("Job", jobs[0])
+
+    return ProcessPoint(WaitForCompleteness(jobs, verbose=verbose), tag)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
     parser.add_argument('-p', '--point', default=None)
@@ -150,18 +167,7 @@ def main():
         space = common.CreateDiscreteSpace()
         point = common.AddFixedParams(space.rvs()[0])
 
-    jobs = [
-        stub.CreateJob(Job(
-            input=CreateJobInput(point, i, sampling=37, seed=args.seed),
-            kind='docker',
-            metadata=CreateMetaData(point, tag, sampling=37, seed=args.seed)
-        ))
-        for i in range(16)
-    ]
-
-    print("Job", jobs[0])
-
-    print("result:", ProcessPoint(WaitForCompleteness(jobs, verbose=True), tag))
+    print("result:", CalculatePoint(point, seed=args.seed, sampling=37, tag=tag, verbose=True))
 
 
 if __name__ == '__main__':
