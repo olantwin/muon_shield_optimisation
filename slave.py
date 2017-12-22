@@ -113,8 +113,20 @@ def main():
     paramFile = '/shared/params_{}.root'.format(
         create_id(params)
     )
+    geoinfoFile = paramFile.replace('params', 'geoinfo')
     heavy = '/shared/heavy_{}'.format(create_id(params))
     lockfile = paramFile + '.lock'
+
+    if os.path.exists(geoinfoFile):
+        geolockfile = geoinfoFile + '.lock'
+        lock = filelock.FileLock(geolockfile)
+        if not lock.is_locked:
+            with lock:
+                with open(geoinfoFile, 'r') as f:
+                    length, weight = map(float, f.read().strip().split(','))
+
+                tmpl['weight'] = weight
+                tmpl['length'] = length
 
     while not os.path.exists(paramFile) and not os.path.exists(heavy):
         lock = filelock.FileLock(lockfile)
@@ -130,7 +142,7 @@ def main():
                         'python2',
                         '/code/get_geo.py',
                         '-g', tmp_paramFile,
-                        '-o', paramFile.replace('params', 'geoinfo')
+                        '-o', geoinfoFile
                         ])
                 shutil.move(
                     '/shield/geofiles/' + os.path.basename(tmp_paramFile),
@@ -140,7 +152,7 @@ def main():
                         'params', 'geo'
                     )
                 )
-                with open(paramFile.replace('params', 'geoinfo'), 'r') as f:
+                with open(geoinfoFile, 'r') as f:
                     length, weight = map(float, f.read().strip().split(','))
 
                 tmpl['weight'] = weight
