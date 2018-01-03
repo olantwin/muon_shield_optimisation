@@ -224,9 +224,7 @@ def main():
     if X and y:
         print('Received previous points ', X, y)
         X = [common.StripFixedParams(point) for point in X]
-        for x, loss in zip(X, y):
-            if space.__contains__(x):
-                clf.tell(x, loss)
+        clf.tell(*zip(*[x, loss for x, loss in zip(X, y) if space.__contains__(x)])
     while not (X and len(X) > RANDOM_STARTS):
         points = space.rvs(n_samples=POINTS_IN_BATCH)
         points = [common.AddFixedParams(p) for p in points]
@@ -246,9 +244,7 @@ def main():
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
             X_new = [common.StripFixedParams(point) for point in X_new]
-            for x, loss in zip(X_new, y_new):
-                if space.__contains__(x):
-                    clf.tell(x, loss)
+            clf.tell(*zip(*[x, loss for x, loss in zip(X_new, y_new) if space.__contains__(x)])
 
     while True:
         points = clf.ask(
@@ -273,16 +269,13 @@ def main():
 
         X_new = [common.StripFixedParams(point) for point in X_new]
 
-        for x, loss in zip(X_new, y_new):
-            if space.__contains__(x):
-                result = clf.tell(x, loss)
+        result = clf.tell(*zip(*[x, loss for x, loss in zip(X_new, y_new) if space.__contains__(x)])
 
         with open('optimiser.pkl', 'wb') as f:
             pickle.dump(clf, f)
 
         with open('result.pkl', 'wb') as f:
-            if result:
-                pickle.dump(result, f)
+            pickle.dump(result, f)
 
 
 if __name__ == '__main__':
