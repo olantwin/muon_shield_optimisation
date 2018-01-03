@@ -56,7 +56,7 @@ def CreateReducedSpace(minimum, variation=0.1):
             ] + 2 * [
                 Integer(2, 70)  # gapIn, gapOut
             ])
-    reduced_dims = [(max((1-variation)*m, dim.bounds[0]), min((1+variation)*m, dim.bounds[1])) for m, dim in zip(minimum, dimensions)]
+    reduced_dims = [(max(int((1-variation)*m), dim.bounds[0]), min(int((1+variation)*m), dim.bounds[1])) for m, dim in zip(minimum, dimensions)]
     return Space(StripFixedParams(reduced_dims))
 
 
