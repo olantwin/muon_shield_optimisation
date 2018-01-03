@@ -43,6 +43,23 @@ def CreateDiscreteSpace():
     return Space(StripFixedParams(dimensions))
 
 
+def CreateReducedSpace(minimum, variation=0.1):
+    dZgap = 10
+    zGap = dZgap / 2  # halflengh of gap
+    dimensions = 8 * [
+        Integer(170 + zGap, 300 + zGap)  # magnet lengths
+        ] + 8 * (
+            2 * [
+                Integer(10, 100)  # dXIn, dXOut
+            ] + 2 * [
+                Integer(20, 200)  # dYIn, dYOut
+            ] + 2 * [
+                Integer(2, 70)  # gapIn, gapOut
+            ])
+    reduced_dims = [(max((1-variation)*m, dim.bounds[0]), min((1+variation)*m, dim.bounds[1])) for m, dim in zip(minimum, dimensions)]
+    return Space(StripFixedParams(reduced_dims))
+
+
 def AddFixedParams(point):
     _fixed_params = FIXED_PARAMS
     for low, high in FIXED_RANGES:
