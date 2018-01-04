@@ -224,8 +224,11 @@ def main():
     if X and y:
         print('Received previous points ', X, y)
         X = [common.StripFixedParams(point) for point in X]
-        X, y = zip(*[(x, loss) for x, loss in zip(X, y) if space.__contains__(x)])
-        clf.tell(X, y)
+        try:
+            X, y = zip(*[(x, loss) for x, loss in zip(X, y) if space.__contains__(x)])
+            clf.tell(X, y)
+        except ValueError:
+            pass
     while not (X and len(X) > RANDOM_STARTS):
         points = space.rvs(n_samples=POINTS_IN_BATCH)
         points = [common.AddFixedParams(p) for p in points]
