@@ -159,6 +159,11 @@ def main():
         help='Random seed of simulation',
         default=1
     )
+    parser.add_argument(
+        '--sampling',
+        help='Muon sample to use.',
+        default=37
+    )
     args = parser.parse_args()
     tag = f'{RUN}_oneshot'
     if args.point:
@@ -167,7 +172,7 @@ def main():
         space = common.CreateDiscreteSpace()
         point = common.AddFixedParams(space.rvs()[0])
 
-    print("result:", CalculatePoint(point, seed=args.seed, sampling=37, tag=tag, verbose=True))
+    print("result:", CalculatePoint(point, seed=args.seed, sampling=args.sampling, tag=tag, verbose=True))
 
 
 if __name__ == '__main__':
