@@ -12,11 +12,12 @@ from skopt.learning import (GaussianProcessRegressor, RandomForestRegressor,
                             GradientBoostingQuantileRegressor)
 
 from disney_common import (FCN, CreateReducedSpace, CreateDiscreteSpace,
-                           StripFixedParams, AddFixedParams)
+                           StripFixedParams, AddFixedParams, create_id)
 from disney_oneshot import (get_result, CreateJobInput, CreateMetaData,
                             ExtractParams, STATUS_FINAL)
 
-from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS, MIN, IMAGE_TAG
+from config import (RUN, POINTS_IN_BATCH, RANDOM_STARTS, MIN, IMAGE_TAG,
+                    COMPATIBLE_TAGS)
 
 SLEEP_TIME = 60  # seconds
 
@@ -107,6 +108,10 @@ def ProcessJobs(jobs, tag):
 
 stub = new_client()
 
+cache = {
+    # id: loss
+}
+
 
 def SubmitDockerJobs(point, tag, sampling, seed):
     return [
@@ -134,8 +139,7 @@ def ProcessPoints(points):
     return X, y
 
 
-def FilterPoints(points, seed, sampling, image_tag=IMAGE_TAG,
-                 tag='all'):
+def FilterPoints(points, seed, sampling, image_tag=IMAGE_TAG, tag='all'):
     filtered = []
     for point in points:
         if len(ExtractParams(point.metadata)) != 56:
@@ -151,13 +155,21 @@ def FilterPoints(points, seed, sampling, image_tag=IMAGE_TAG,
 
 def CalculatePoints(points, tag, sampling, seed):
     shield_jobs = [
-        SubmitDockerJobs(
-            point, tag, sampling=sampling, seed=seed)
-        for point in points
+        SubmitDockerJobs(point, tag, sampling=sampling, seed=seed)
+        for point in points if create_id(point) not in cache
     ]
 
-    shield_jobs = WaitCompleteness(shield_jobs)
-    return ProcessJobs(shield_jobs, tag)
+    X_cached, y_cached = zip(*[(point, cache[create_id(point)])
+                               for point in points
+                               if create_id(point) in cache])
+
+    if shield_jobs:
+        shield_jobs = WaitCompleteness(shield_jobs)
+        X_new, y_new = ProcessJobs(shield_jobs, tag)
+
+    X, y = X_cached + X_new, y_cached + y_new
+
+    return X, y
 
 
 def main():
@@ -172,22 +184,32 @@ def main():
     args = parser.parse_args()
     tag = f'{RUN}_{args.opt}' + f'_{args.tag}' if args.tag else ''
 
-    space = CreateReducedSpace(
-        MIN, 0.1) if args.reduced else CreateDiscreteSpace()
+    space = CreateReducedSpace(MIN,
+                               0.1) if args.reduced else CreateDiscreteSpace()
 
     clf = CreateOptimizer(
         args.opt, space, random_state=int(args.state) if args.state else None)
 
     # TODO use random points for init, don't tag them with optimiser
 
-    all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=0))
-    # TODO request multiple tags (use all compatible image tags)
+    all_points = stub.ListJobs(ListJobsRequest(kind='point', how_many=0)).jobs
     X, y = ProcessPoints(
         FilterPoints(
-            all_jobs_list.jobs,
-            tag=tag,
-            seed=args.seed,
-            sampling=args.sampling))
+            all_points, tag='all', seed=args.seed, sampling=args.sampling))
+
+    for x, loss in zip(X, y):
+        cache[create_id(x)] = loss
+
+    for image in COMPATIBLE_TAGS[IMAGE_TAG]:
+        for x, loss in zip(
+                ProcessPoints(
+                    FilterPoints(
+                        all_points,
+                        tag='all',
+                        seed=args.seed,
+                        sampling=args.sampling,
+                        image_tag=image))):
+            cache[create_id(x)] = loss
 
     if X and y:
         print('Received previous points ', X, y)
@@ -202,9 +224,8 @@ def main():
         points = space.rvs(n_samples=POINTS_IN_BATCH)
         points = [AddFixedParams(p) for p in points]
 
-        # TODO change tag
         X_new, y_new = CalculatePoints(
-            points, tag, sampling=args.sampling, seed=args.seed)
+            points, 'random', sampling=args.sampling, seed=args.seed)
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
             X_new = [StripFixedParams(point) for point in X_new]
