@@ -259,7 +259,7 @@ def main():
             n_points=POINTS_IN_BATCH,
             strategy='cl_mean')
 
-        result = []
+        points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
             SubmitDockerJobs(
