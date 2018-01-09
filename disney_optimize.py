@@ -185,6 +185,17 @@ def FilterPoints(points, seed, sampling,
     return filtered
 
 
+def CalculatePoints(points, tag, sampling, seed):
+    shield_jobs = [
+        SubmitDockerJobs(
+            point, tag, sampling=sampling, seed=seed)
+        for point in points
+    ]
+
+    shield_jobs = WaitCompleteness(shield_jobs)
+    return ProcessJobs(shield_jobs, tag)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Start optimizer.')
     parser.add_argument('--opt', help='Write an optimizer.', default='rf')
@@ -227,18 +238,9 @@ def main():
         points = space.rvs(n_samples=POINTS_IN_BATCH)
         points = [common.AddFixedParams(p) for p in points]
 
-        shield_jobs = [
-            SubmitDockerJobs(
-                point,
-                tag,
-                sampling=args.sampling,
-                seed=args.seed)
-            # TODO change tag
-            for point in points
-        ]
-
-        shield_jobs = WaitCompleteness(shield_jobs)
-        X_new, y_new = ProcessJobs(shield_jobs, tag)
+        # TODO change tag
+        X_new, y_new = CalculatePoints(
+            points, tag, sampling=args.sampling, seed=args.seed)
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
             X_new = [common.StripFixedParams(point) for point in X_new]
@@ -251,17 +253,8 @@ def main():
 
         points = [common.AddFixedParams(p) for p in points]
 
-        shield_jobs = [
-            SubmitDockerJobs(
-                point,
-                tag,
-                sampling=args.sampling,
-                seed=args.seed)
-            for point in points
-        ]
-
-        shield_jobs = WaitCompleteness(shield_jobs)
-        X_new, y_new = ProcessJobs(shield_jobs, tag)
+        X_new, y_new = CalculatePoints(
+            points, tag, sampling=args.sampling, seed=args.seed)
 
         print('Received new points ', X_new, y_new)
 
