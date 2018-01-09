@@ -163,6 +163,7 @@ def ProcessPoints(points):
             y.append(float(point.output))
         except Exception as e:
             print(e)
+            raise
 
     return X, y
 
@@ -171,6 +172,8 @@ def FilterPoints(points, seed, sampling,
                  image_tag=config.IMAGE_TAG, tag='all'):
     filtered = []
     for point in points:
+        if len(ExtractParams(point.metadata)) != 56:
+            continue
         metadata = json.loads(point.metadata)['user']
         if (
                 (tag == 'all' or metadata['tag'] == tag)
