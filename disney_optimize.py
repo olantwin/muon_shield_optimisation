@@ -4,32 +4,19 @@ import argparse
 import json
 import pickle
 
-import disneylandClient
-from disneylandClient import (
-    Job,
-    RequestWithId,
-    ListJobsRequest
-)
+from disneylandClient import (Job, RequestWithId, ListJobsRequest, new_client)
 
 from sklearn.ensemble import GradientBoostingRegressor
 from skopt import Optimizer
-from skopt.learning import (
-    GaussianProcessRegressor,
-    RandomForestRegressor,
-    GradientBoostingQuantileRegressor
-)
+from skopt.learning import (GaussianProcessRegressor, RandomForestRegressor,
+                            GradientBoostingQuantileRegressor)
 
-import disney_common as common
-from disney_oneshot import (
-    get_result,
-    CreateJobInput,
-    CreateMetaData,
-    ExtractParams,
-    WaitForCompleteness,
-    STATUS_FINAL
-)
-import config
-from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS, MIN
+from disney_common import (FCN, CreateReducedSpace, CreateDiscreteSpace,
+                           StripFixedParams, AddFixedParams)
+from disney_oneshot import (get_result, CreateJobInput, CreateMetaData,
+                            ExtractParams, STATUS_FINAL)
+
+from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS, MIN, IMAGE_TAG
 
 SLEEP_TIME = 60  # seconds
 
@@ -38,15 +25,14 @@ def ProcessPoint(jobs, tag):
     if json.loads(jobs[0].metadata)['user']['tag'] == tag:
         try:
             weight, length, _, muons_w = get_result(jobs)
-            y = common.FCN(weight, muons_w, length)
+            y = FCN(weight, muons_w, length)
             X = ExtractParams(jobs[0].metadata)
 
-            stub.CreateJob(Job(
-                input='',
-                output=str(y),
-                kind='point',
-                metadata=jobs[0].metadata
-            ))
+            stub.CreateJob(
+                Job(input='',
+                    output=str(y),
+                    kind='point',
+                    metadata=jobs[0].metadata))
             # TODO modify original jobs to mark them as processed,
             # job_id of point
             print(X, y)
@@ -60,36 +46,23 @@ def CreateOptimizer(clf_type, space, random_state=None):
         clf = Optimizer(
             space,
             RandomForestRegressor(n_estimators=500, max_depth=7, n_jobs=-1),
-            random_state=random_state
-        )
+            random_state=random_state)
     elif clf_type == 'gb':
         clf = Optimizer(
             space,
             GradientBoostingQuantileRegressor(
                 base_estimator=GradientBoostingRegressor(
-                    n_estimators=100,
-                    max_depth=4,
-                    loss='quantile'
-                )
-            ),
-            random_state=random_state
-        )
+                    n_estimators=100, max_depth=4, loss='quantile')),
+            random_state=random_state)
     elif clf_type == 'gp':
         clf = Optimizer(
             space,
             GaussianProcessRegressor(
-                alpha=1e-7,
-                normalize_y=True,
-                noise='gaussian'
-            ),
-            random_state=random_state
-        )
+                alpha=1e-7, normalize_y=True, noise='gaussian'),
+            random_state=random_state)
     else:
         clf = Optimizer(
-            space,
-            base_estimator='dummy',
-            random_state=random_state
-        )
+            space, base_estimator='dummy', random_state=random_state)
 
     return clf
 
@@ -101,17 +74,13 @@ def WaitCompleteness(jobs):
         time.sleep(SLEEP_TIME)
 
         ids = [[job.id for job in point] for point in jobs]
-        uncompleted_jobs = [
-            [
-                stub.GetJob(RequestWithId(id=id))
-                for id in point
-            ]
-            for point in ids
+        uncompleted_jobs = [[
+            stub.GetJob(RequestWithId(id=id)) for id in point
+        ] for point in ids]
+        jobs_completed = [
+            job.status in STATUS_FINAL
+            for point in uncompleted_jobs for job in point
         ]
-        jobs_completed = [job.status
-                          in STATUS_FINAL
-                          for point in uncompleted_jobs
-                          for job in point]
 
         if all(jobs_completed):
             return uncompleted_jobs
@@ -130,25 +99,22 @@ def WaitCompleteness(jobs):
 
 def ProcessJobs(jobs, tag):
     print('[{}] Processing jobs...'.format(time.time()))
-    results = [
-        ProcessPoint(point, tag)
-        for point in jobs
-    ]
+    results = [ProcessPoint(point, tag) for point in jobs]
     print(f'Got results {results}')
     results = [result for result in results if result]
     return zip(*results) if results else ([], [])
 
 
-stub = disneylandClient.new_client()
+stub = new_client()
 
 
 def SubmitDockerJobs(point, tag, sampling, seed):
     return [
-        stub.CreateJob(Job(
-            input=CreateJobInput(point, i, sampling=sampling, seed=seed),
-            kind='docker',
-            metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
-        ))
+        stub.CreateJob(
+            Job(input=CreateJobInput(point, i, sampling=sampling, seed=seed),
+                kind='docker',
+                metadata=CreateMetaData(
+                    point, tag, sampling=sampling, seed=seed)))
         for i in range(16)
     ]
 
@@ -168,19 +134,17 @@ def ProcessPoints(points):
     return X, y
 
 
-def FilterPoints(points, seed, sampling,
-                 image_tag=config.IMAGE_TAG, tag='all'):
+def FilterPoints(points, seed, sampling, image_tag=IMAGE_TAG,
+                 tag='all'):
     filtered = []
     for point in points:
         if len(ExtractParams(point.metadata)) != 56:
             continue
         metadata = json.loads(point.metadata)['user']
-        if (
-                (tag == 'all' or metadata['tag'] == tag)
+        if ((tag == 'all' or metadata['tag'] == tag)
                 and metadata['image_tag'] == image_tag
                 and (metadata['seed'] == seed or seed == 'all')
-                and (metadata['sampling'] == sampling or sampling == 'all')
-        ):
+                and (metadata['sampling'] == sampling or sampling == 'all')):
             filtered.append(point)
     return filtered
 
@@ -208,26 +172,26 @@ def main():
     args = parser.parse_args()
     tag = f'{RUN}_{args.opt}' + f'_{args.tag}' if args.tag else ''
 
-    space = common.CreateReducedSpace(
-        MIN, 0.1) if args.reduced else common.CreateDiscreteSpace()
+    space = CreateReducedSpace(
+        MIN, 0.1) if args.reduced else CreateDiscreteSpace()
 
     clf = CreateOptimizer(
-        args.opt,
-        space,
-        random_state=int(args.state) if args.state else None
-    )
+        args.opt, space, random_state=int(args.state) if args.state else None)
 
     # TODO use random points for init, don't tag them with optimiser
 
     all_jobs_list = stub.ListJobs(ListJobsRequest(kind='point', how_many=0))
-    # TODO request multiple tags
+    # TODO request multiple tags (use all compatible image tags)
     X, y = ProcessPoints(
         FilterPoints(
-            all_jobs_list.jobs, tag=tag, seed=args.seed, sampling=args.sampling))
+            all_jobs_list.jobs,
+            tag=tag,
+            seed=args.seed,
+            sampling=args.sampling))
 
     if X and y:
         print('Received previous points ', X, y)
-        X = [common.StripFixedParams(point) for point in X]
+        X = [StripFixedParams(point) for point in X]
         try:
             X, y = zip(*[(x, loss) for x, loss in zip(X, y)
                          if space.__contains__(x)])
@@ -236,29 +200,27 @@ def main():
             print('None of the previous points are contained in the space.')
     while not (X and len(X) > RANDOM_STARTS):
         points = space.rvs(n_samples=POINTS_IN_BATCH)
-        points = [common.AddFixedParams(p) for p in points]
+        points = [AddFixedParams(p) for p in points]
 
         # TODO change tag
         X_new, y_new = CalculatePoints(
             points, tag, sampling=args.sampling, seed=args.seed)
         print('Received new points ', X_new, y_new)
         if X_new and y_new:
-            X_new = [common.StripFixedParams(point) for point in X_new]
+            X_new = [StripFixedParams(point) for point in X_new]
             clf.tell(X_new, y_new)
 
     while True:
-        points = clf.ask(
-            n_points=POINTS_IN_BATCH,
-            strategy='cl_mean')
+        points = clf.ask(n_points=POINTS_IN_BATCH, strategy='cl_mean')
 
-        points = [common.AddFixedParams(p) for p in points]
+        points = [AddFixedParams(p) for p in points]
 
         X_new, y_new = CalculatePoints(
             points, tag, sampling=args.sampling, seed=args.seed)
 
         print('Received new points ', X_new, y_new)
 
-        X_new = [common.StripFixedParams(point) for point in X_new]
+        X_new = [StripFixedParams(point) for point in X_new]
 
         result = clf.tell(X_new, y_new)
 
