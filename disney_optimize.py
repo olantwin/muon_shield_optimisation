@@ -29,7 +29,7 @@ from disney_oneshot import (
     STATUS_FINAL
 )
 import config
-from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS
+from config import RUN, POINTS_IN_BATCH, RANDOM_STARTS, MIN
 
 SLEEP_TIME = 60  # seconds
 
@@ -190,25 +190,15 @@ def main():
     parser.add_argument('--opt', help='Write an optimizer.', default='rf')
     parser.add_argument('--tag', help='Additional suffix for tag', default='')
     parser.add_argument(
-        '--state',
-        help='Random state of Optimizer',
-        default=None
-    )
-    parser.add_argument(
-        '--seed',
-        help='Random seed of simulation',
-        default=1
-    )
-    parser.add_argument(
-        '--sampling',
-        default=37
-    )
+        '--state', help='Random state of Optimizer', default=None)
+    parser.add_argument('--seed', help='Random seed of simulation', default=1)
+    parser.add_argument('--sampling', default=37)
+    parser.add_argument('--reduced', action='store_true')
     args = parser.parse_args()
     tag = f'{RUN}_{args.opt}' + f'_{args.tag}' if args.tag else ''
 
-    MIN = [70.0, 170.0, 275.0, 300.0, 226.0, 204.0, 235.0, 239.0, 40.0, 40.0, 150.0, 150.0, 2.0, 2.0, 80.0, 80.0, 150.0, 150.0, 2.0, 2.0, 77.0, 58.0, 104.0, 60.0, 57.0, 22.0, 33.0, 10.0, 35.0, 99.0, 15.0, 69.0, 60.0, 27.0, 179.0, 38.0, 30.0, 61.0, 13.0, 14.0, 135.0, 158.0, 57.0, 60.0, 12.0, 49.0, 22.0, 72.0, 24.0, 16.0, 47.0, 67.0, 68.0, 154.0, 6.0, 53.0]
-
-    space = common.CreateReducedSpace(MIN, 0.1)
+    space = common.CreateReducedSpace(
+        MIN, 0.1) if args.reduced else common.CreateDiscreteSpace()
 
     clf = CreateOptimizer(
         args.opt,
