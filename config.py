@@ -72,6 +72,15 @@ FIXED_RANGES = [(0, 2), (8, 20)]
 FIXED_PARAMS = StripFreeParams(DEFAULT_POINT)
 IMAGE = 'olantwin/ship-shield'
 IMAGE_TAG = '20171222_T1'
+COMPATIBLE_TAGS = {
+    '20171207_T1': [
+        '20171222_T1'
+        ],
+    '20171222_T1': [
+        '20171207_T1',
+        ],
+    '20180108_T1': [],
+}
 RESULTS_TEMPLATE = {
     'error': 'Some',
     'weight': None,
