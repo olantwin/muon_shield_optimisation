@@ -12,7 +12,7 @@ from skopt.learning import (GaussianProcessRegressor, RandomForestRegressor,
                             GradientBoostingQuantileRegressor)
 
 from disney_common import (FCN, CreateReducedSpace, CreateDiscreteSpace,
-                           StripFixedParams, AddFixedParams, create_id)
+                           StripFixedParams, AddFixedParams)
 from disney_oneshot import (get_result, CreateJobInput, CreateMetaData,
                             ExtractParams, STATUS_FINAL)
 
@@ -156,12 +156,12 @@ def FilterPoints(points, seed, sampling, image_tag=IMAGE_TAG, tag='all'):
 def CalculatePoints(points, tag, sampling, seed):
     shield_jobs = [
         SubmitDockerJobs(point, tag, sampling=sampling, seed=seed)
-        for point in points if create_id(point) not in cache
+        for point in points if json.dumps(point) not in cache
     ]
 
-    X_cached, y_cached = zip(*[(point, cache[create_id(point)])
+    X_cached, y_cached = zip(*[(point, cache[json.dumps(point)])
                                for point in points
-                               if create_id(point) in cache])
+                               if json.dumps(point) in cache])
 
     if shield_jobs:
         shield_jobs = WaitCompleteness(shield_jobs)
@@ -198,7 +198,7 @@ def main():
             all_points, tag='all', seed=args.seed, sampling=args.sampling))
 
     for x, loss in zip(X, y):
-        cache[create_id(x)] = loss
+        cache[json.dumps(x)] = loss
 
     for image in COMPATIBLE_TAGS[IMAGE_TAG]:
         for x, loss in zip(
@@ -209,7 +209,7 @@ def main():
                         seed=args.seed,
                         sampling=args.sampling,
                         image_tag=image))):
-            cache[create_id(x)] = loss
+            cache[json.dumps(x)] = loss
 
     if X and y:
         print('Received previous points ', X, y)
