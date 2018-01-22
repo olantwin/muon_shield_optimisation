@@ -114,10 +114,11 @@ JOB_TEMPLATE = {
         '''-f /shield/worker_files/sampling_{sampling}/'''
         '''muons_{job_id}_16.root '''
         '''--results /output/result.json '''
-        '''--hists /output/hists.root --seed {seed}' ''',
+        '''--hists /output/hists_{IMAGE_TAG}_'''
+        '''{params}_{job_id}_{sampling}_{seed}.root --seed {seed}' ''',
     },
     'required_outputs': {
-        'output_uri': 'host:/srv/local/skygrid-local-storage/$JOB_ID',
+        'output_uri': 'eos:/eos/experiment/ship/skygrid/histograms_raw',
         'file_contents': [{
             'file': 'result.json',
             'to_variable': 'result'

@@ -10,7 +10,7 @@ from disneylandClient import (
     RequestWithId,
 )
 import config
-from config import RUN
+from config import RUN, IMAGE_TAG
 import disney_common as common
 
 STATUS_IN_PROCESS = set([
@@ -98,7 +98,8 @@ def CreateJobInput(point, number, sampling, seed):
             params=base64.b64encode(str(point).encode('utf8')).decode('utf8'),
             sampling=sampling,
             seed=seed,
-            job_id=number+1
+            job_id=number+1,
+            IMAGE_TAG=IMAGE_TAG
         )
 
     return json.dumps(job)
