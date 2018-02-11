@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 import os
 from time import sleep
+import numpy as np
 import copy
 import json
 import argparse
@@ -195,6 +196,7 @@ def main():
             chain = r.TChain('cbmsim')
             chain.Add(outFile)
             xs = analyse(chain, args.hists)
+            np.save(args.xs_path, np.array(xs))
             tmpl['muons'] = len(xs)
             tmpl['muons_w'] = sum(xs)
         except Exception as e:
@@ -227,6 +229,8 @@ if __name__ == '__main__':
     parser.add_argument('--hists', default='hists.root')
     parser.add_argument('--params', required=True)
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--xs_path', default='xs.npz')
     parser.add_argument('-n', '--nEvents', type=int)
+
     args = parser.parse_args()
     main()
