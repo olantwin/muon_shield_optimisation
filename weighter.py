@@ -62,17 +62,19 @@ def load_previous_results(tag):
 
 
 
-def sample_muons(muon_loss, muon_indeces, share=0.05):
+def sample_muons(muon_loss, muon_indeces, number_of_muons, share=0.05):
     '''
     Function sample the indexes of muons according to weights
     '''
     if share == None:
         share = 0.05
 
-    cum_loss = np.sum(np.array(muon_loss), axis=0)
-    cum_indeces = np.zeros(len(cum_loss))
-    for index in muon_indeces:
-        cum_indeces[index] += 1
+    cum_loss = np.zeros(number_of_muons)
+    cum_indeces = np.zeros(number_of_muons)
+
+    for i in range(len(muon_loss)):
+        cum_loss[muon_indeces[i]] += muon_loss[i]
+        cum_indeces[muon_indeces[i]] += 1
 
     weights = cum_loss / cum_indeces
     sample_size = int(len(weigths) * share)
@@ -134,12 +136,13 @@ def main():
     args = parser.parse_args()
     args.xs_path = os.path.join("/output", get_xs_path(args.tag, args.point_id))
 
+    number_of_muons = count_muons(args.input)
     muon_loss, muon_indeces = load_previous_results(args.tag)
+
     if len(muon_loss) == 0:
-        number_of_muons = count_muons(args.input)
         next_indeces = np.arange(number_of_muons)
     else:
-        next_indeces = sample_muons(muon_loss, muon_indeces, share=args.share_muons)
+        next_indeces = sample_muons(muon_loss, muon_indeces, number_of_muons, share=args.share_muons)
 
     create_muons_files(args.input, "/shield/worker_files/sampling_is/muons.root", next_indeces)
     np.save(get_indeces_path(args.tag, args.point_id), next_indeces)
