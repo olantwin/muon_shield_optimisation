@@ -4,14 +4,12 @@ import ROOT as r
 import shlex, subprocess
 import argparse
 
-EOS_PATH = "root://eoslhcb.cern.ch/eos/ship/data/IS_experiment"
-FULL_MUONS_PATH = 'root://eoslhcb.cern.ch/eos/ship/data/Mbias/pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'
-SLAVE_CMD = '''python2 code/slave.py ''' \
-            '''--params {params} ''' \
-            '''-f /shield/worker_files/sampling_is/''' \
-            '''muons.root ''' \
-            '''--results /output/result.json ''' \
-            '''--hists /output/hists_{tag}.root --seed {seed} ''' \
+SLAVE_CMD = '''python2 code/slave.py '''
+            '''--params {params} '''
+            '''-f /shield/worker_files/sampling_is/'''
+            '''muons.root '''
+            '''--results /output/result.json '''
+            '''--hists /output/hists_{tag}.root --seed {seed} '''
             '''--xs_path {xs_path}'''
 
 def loss(x):
@@ -24,10 +22,10 @@ def loss(x):
     return result
 
 def get_xs_path(tag, id):
-    return os.path.join(EOS_PATH, "xs_" + tag + str(id))
+    return "xs_" + tag + str(id)
 
 def get_indeces_path(tag, id):
-    return os.path.join(EOS_PATH, "index_" + tag + str(id))
+    return "index_" + tag + str(id)
 
 def start_slave(command_line):
     '''
@@ -44,7 +42,7 @@ def load_previous_results(tag):
     '''
     prev_results = []
     prev_indeces = []
-    files = os.listdir(EOS_PATH)
+    files = os.listdir("/output")
 
     i = 0
     while True:
@@ -106,6 +104,7 @@ def create_muons_files(filename_read, filename_write, indexes):
         i += 1
 
     outtuple.Write()
+    f.Close()
 
 def count_muons(filename_read):
     '''
@@ -113,12 +112,7 @@ def count_muons(filename_read):
     '''
     f = r.TFile.Open(filename_read, 'read')
     intuple = f.Get('pythia8-Geant4')
-    i = 0
-
-    for muon in intuple:
-        i += 1
-
-    return i
+    return intuple.GetEntriesFast()
 
 def get_command_line(SLAVE_CMD, args):
     return SLAVE_CMD.format(**vars(args))
@@ -128,9 +122,7 @@ def main():
     parser.add_argument(
         '-f',
         '--input',
-        default='root://eoslhcb.cern.ch/'
-        '/eos/ship/data/Mbias/'
-        'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
+        default='/shield/worker_files/sampling_1/muons_1.root')
     parser.add_argument('--results', default='results.json')
     parser.add_argument('--hists', default='hists.root')
     parser.add_argument('--params', required=True)
@@ -140,16 +132,16 @@ def main():
     parser.add_argument('--share_muons', type=float)
 
     args = parser.parse_args()
-    args.xs_path = os.path.join(EOS_PATH, get_xs_path(args.tag, args.point_id))
+    args.xs_path = os.path.join("/output", get_xs_path(args.tag, args.point_id))
 
     muon_loss, muon_indeces = load_previous_results(args.tag)
     if len(muon_loss) == 0:
-        number_of_muons = count_muons(FULL_MUONS_PATH)
+        number_of_muons = count_muons(args.input)
         next_indeces = np.arange(number_of_muons)
     else:
         next_indeces = sample_muons(muon_loss, muon_indeces, share=args.share_muons)
 
-    create_muons_files(FULL_MUONS_PATH, "/shield/worker_files/sampling_is/muons.root", next_indeces)
+    create_muons_files(args.input, "/shield/worker_files/sampling_is/muons.root", next_indeces)
     np.save(get_indeces_path(args.tag, args.point_id), next_indeces)
 
     command_line = get_command_line(SLAVE_CMD, args)
