@@ -89,7 +89,7 @@ RESULTS_TEMPLATE = {
     'status': None,
 }
 JOB_TEMPLATE = {
-    'input': ['eos:/eos/experiment/ship/skygrid/importance_sampling'],
+    'input': [],
     'container': {
         'workdir':
         '',
@@ -109,23 +109,23 @@ JOB_TEMPLATE = {
         'near_run3',
         'cmd':
         '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh; '''
-        '''python2 /code/weighter.py '''
+        '''python2 /code/slave.py '''
         '''--params {params} '''
         '''-f /shield/worker_files/sampling_{sampling}/'''
         '''muons_{job_id}_16.root '''
         '''--results /output/result.json '''
         '''--hists /output/hists_{IMAGE_TAG}_'''
-        '''{params}_{job_id}_{sampling}_{seed}.root --seed {seed} --share_muons 0.05'''
-        '''--tag "imp_sampling" --point_id {point_id}' ''',
+        '''{params}_{job_id}_{sampling}_{seed}.root --seed {seed}' ''',
     },
     'required_outputs': {
-        'output_uri': 'eos:/eos/experiment/ship/skygrid/importance_sampling',
+        'output_uri': 'eos:/eos/experiment/ship/skygrid/histograms_raw',
         'file_contents': [{
             'file': 'result.json',
             'to_variable': 'result'
         }]
     }
 }
+
 METADATA_TEMPLATE = {
     'user': {
         'tag': '',

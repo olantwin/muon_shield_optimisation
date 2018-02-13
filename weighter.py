@@ -22,10 +22,10 @@ def loss(x):
     return result
 
 def get_xs_path(tag, id):
-    return "xs_" + tag + str(id)
+    return os.path.join("/output", "xs_" + tag + str(id))
 
 def get_indeces_path(tag, id):
-    return "index_" + tag + str(id)
+    return os.path.join("/output", "index_" + tag + str(id))
 
 def start_slave(command_line):
     '''
@@ -36,47 +36,22 @@ def start_slave(command_line):
     proc.wait()
 
 
-def load_previous_results(tag):
-    '''
-    This function should load all the previous results from eos and calculate the mean over each muon.
-    '''
-    prev_results = []
-    prev_indeces = []
-    files = os.listdir("/output")
+def load_previous_cumulative_arrays():
+    if os.path.exists("/input/cumloss.npy") is True:
+        cum_loss = np.load("/input/cumloss.npy")
+        cum_indeces = np.load("/input/cumindeces.npy")
+        return cum_loss, cum_indeces
+    else:
+        return np.array([]), np.array([])
 
-    i = 0
-    while True:
-        filename = "xs_" + tag + str(i) + ".npy"
-        if filename not in files:
-            break
-
-        xs = np.load(get_xs_path(tag, i))
-        prev_results.append(loss(np.array(xs)))
-
-        indeces = np.load(get_indeces_path(tag, i))
-        prev_indeces.append(indeces)
-        i += 1
-
-    return prev_results, prev_indeces
-
-
-
-
-def sample_muons(muon_loss, muon_indeces, number_of_muons, share=0.05):
+def sample_muons(muon_loss, muon_indeces, share=0.05):
     '''
     Function sample the indexes of muons according to weights
     '''
     if share == None:
         share = 0.05
 
-    cum_loss = np.zeros(number_of_muons)
-    cum_indeces = np.zeros(number_of_muons)
-
-    for i in range(len(muon_loss)):
-        cum_loss[muon_indeces[i]] += muon_loss[i]
-        cum_indeces[muon_indeces[i]] += 1
-
-    weights = cum_loss / cum_indeces
+    weights = muon_loss / moun_indeces
     sample_size = int(len(weigths) * share)
 
     if sample_size == 0:
@@ -137,12 +112,14 @@ def main():
     args.xs_path = os.path.join("/output", get_xs_path(args.tag, args.point_id))
 
     number_of_muons = count_muons(args.input)
-    muon_loss, muon_indeces = load_previous_results(args.tag)
+    muon_loss, muon_indeces = load_previous_cumulative_arrays():
 
     if len(muon_loss) == 0:
         next_indeces = np.arange(number_of_muons)
+        np.save("/output/cumloss.npy", np.zeros(number_of_muons))
+        np.save("/output/cumindeces.npy", np.ones(number_of_muons) * 1e-5)
     else:
-        next_indeces = sample_muons(muon_loss, muon_indeces, number_of_muons, share=args.share_muons)
+        next_indeces = sample_muons(muon_loss, muon_indeces, share=args.share_muons)
 
     create_muons_files(args.input, "/shield/worker_files/sampling_is/muons.root", next_indeces)
     np.save(get_indeces_path(args.tag, args.point_id), next_indeces)
