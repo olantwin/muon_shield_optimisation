@@ -1,3 +1,5 @@
+IMAGE = 'olantwin/ship-shield'
+IMAGE_TAG = 
 
 JOB_TEMPLATE = {
     'input': ['eos:/eos/experiment/ship/skygrid/importance_sampling'],
