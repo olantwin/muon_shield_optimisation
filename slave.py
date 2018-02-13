@@ -220,8 +220,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '-f',
         '--input',
-        default='root://eoslhcb.cern.ch/'
-        '/eos/ship/data/Mbias/'
+        default='root://eospublic.cern.ch/'
+        '/eos/experiment/ship/data/Mbias/'
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument('--results', default='results.json')
     parser.add_argument('--hists', default='hists.root')

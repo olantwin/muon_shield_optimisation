@@ -109,13 +109,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '-f',
         '--input',
-        default='root://eoslhcb.cern.ch/'
-        '/eos/ship/data/Mbias/'
+        default='root://eospublic.cern.ch/'
+        '/eos/experiment/ship/data/Mbias/'
         'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument(
         '--workDir',
-        default='root://eoslhcb.cern.ch/'
-        '/eos/ship/user/olantwin/skygrid')
+        default='root://eospublic.cern.ch/'
+        '/eos/experiment/ship/user/olantwin/skygrid')
     parser.add_argument(
         '-j',
         '--njobs',
