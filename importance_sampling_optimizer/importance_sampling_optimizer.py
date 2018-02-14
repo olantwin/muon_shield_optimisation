@@ -63,7 +63,7 @@ def main():
         print('Received new points ', X_new, y_new)
         X_new = [common.StripFixedParams(point) for point in X_new]
         result = clf.tell(X_new, y_new)
-        CollectResults()
+        CollectResults("impsampl")
 
         with open('optimiser.pkl', 'wb') as f:
             pickle.dump(clf, f)
