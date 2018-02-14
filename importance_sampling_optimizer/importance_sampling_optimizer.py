@@ -44,6 +44,7 @@ def main():
         X = [common.StripFixedParams(point) for point in X]
         clf.tell(X, y)
 
+    i = 0
     while True:
         points = clf.ask(
             n_points=POINTS_IN_BATCH,
@@ -51,10 +52,10 @@ def main():
 
         points = [common.AddFixedParams(p) for p in points]
 
-        shield_jobs = [
-            SubmitDockerJobs(point, tag, sampling='IS', seed=1)
-            for point in points
-        ]
+        shield_jobs = []
+        for j in range(len(points)):
+            SubmitDockerJobs(points[i], tag, sampling='IS', seed=1, point_id=i * len(points) + j, share=0.05, tag="impsampl")
+
 
         shield_jobs = WaitCompleteness(shield_jobs)
         X_new, y_new = ProcessJobs(shield_jobs, space, tag)

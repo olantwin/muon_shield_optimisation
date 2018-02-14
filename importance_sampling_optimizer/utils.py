@@ -41,10 +41,10 @@ def CreateCollectorJobInput(tag):
     return json.dumps(job)
 
 
-def SubmitDockerJobs(point, tag, sampling, seed):
+def SubmitDockerJobs(point, tag, sampling, seed, point_id, share, tag):
     return [
         stub.CreateJob(Job(
-            input=CreateSimulationJobInput(point, i),
+            input=CreateSimulationJobInput(point, i, sampling, seed, point_id, share, tag),
             kind='docker',
             metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
         ))
