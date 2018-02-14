@@ -71,6 +71,8 @@ def main():
         with open('result.pkl', 'wb') as f:
             pickle.dump(result, f)
 
+        i += 1
+
 
 if __name__ == '__main__':
     main()

@@ -15,14 +15,14 @@ from .disney_oneshot import (
 from config import JOB_TEMPLATE_IMP_SAMPLING
 from .result_collector.config import JOB_TEMPLATE as JOB_COLLECTOR_TEMPLATE
 
-def CreateSimulationJobInput(point, number, sampling, seed, point_id, share, tag):
+def CreateSimulationJobInput(point, sampling, seed, point_id, share, tag):
     job = copy.deepcopy(JOB_TEMPLATE_IMP_SAMPLING)
     job['container']['cmd'] = \
         job['container']['cmd'].format(
             params=base64.b64encode(str(point).encode('utf8')).decode('utf8'),
             sampling=sampling,
             seed=seed,
-            job_id=number+1,
+            job_id=0,
             IMAGE_TAG=IMAGE_TAG,
             point_id=point_id,
             share=share,
@@ -44,12 +44,11 @@ def CreateCollectorJobInput(tag):
 def SubmitDockerJobs(point, tag, sampling, seed, point_id, share, tag):
     return [
         stub.CreateJob(Job(
-            input=CreateSimulationJobInput(point, i, sampling, seed, point_id, share, tag),
+            input=CreateSimulationJobInput(point, sampling, seed, point_id, share, tag),
             kind='docker',
             metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
         ))
-        for i in range(16)
-    ]
+        ]
 
 def ProcessJob(job, space, tag):
     if json.loads(job[0].metadata)['user']['tag'] == tag:
