@@ -52,7 +52,7 @@ def main():
         points = [common.AddFixedParams(p) for p in points]
 
         shield_jobs = [
-            SubmitDockerJobs(point, tag, sampling=37, seed=1)
+            SubmitDockerJobs(point, tag, sampling='IS', seed=1)
             for point in points
         ]
 

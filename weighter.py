@@ -59,7 +59,7 @@ def sample_muons(muon_loss, muon_indeces, share=0.05):
 
     return np.random.choice(len(weights), size=sample_size, p=weigts/np.sum(weights), replace=True)
 
-def create_muons_files(filename_read, filename_write, indexes):
+def create_muons_files(filename_read, filename_write, indexes): # TODO fix that
     '''
     Function takes all the muons, choose subsample according to indeces and saves it to filename_write
     '''
@@ -69,15 +69,19 @@ def create_muons_files(filename_read, filename_write, indexes):
     outtuple = intuple.CloneTree(0)
 
     i = 0
-    indexes_pointer = 0
+    ind_cur = 0
+    indexes = np.sort(indexes)
 
     for muon in intuple:
-        if i == indexes[indexes_pointer]:
+        while (i == indexes[ind_cur]):
             outtuple.Fill(muon)
-            indexes_pointer += 1
-        if indexes_pointer == len(indexes):
-            break
-
+            if (ind_cur < len(indexes) - 1 and
+                indexes[ind_cur] != indexes[ind_cur + 1]):
+                ind_cur += 1
+                break
+            ind_cur += 1
+            if (ind_cur == len(indexes)):
+                break
         i += 1
 
     outtuple.Write()
@@ -99,11 +103,11 @@ def main():
     parser.add_argument(
         '-f',
         '--input',
-        default='/shield/worker_files/sampling_1/muons_1.root')
+        default='/input/pythia8_Geant4-withCharm_onlyMuons_4magTarget.root')
     parser.add_argument('--results', default='results.json')
     parser.add_argument('--hists', default='hists.root')
     parser.add_argument('--params', required=True)
-    parser.add_argument('--point_id', required=True)
+    parser.add_argument('--point_id', type=int, required=True)
     parser.add_argument('--tag', default="")
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--share_muons', type=float)

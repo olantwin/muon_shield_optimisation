@@ -32,7 +32,6 @@ def calculate_cuminfo(muon_loss, muon_indeces, old_cumloss, old_cumindeces):
     '''
     Function accumulates new results.
     '''
-
     cum_loss = np.zeros(len(old_cumloss))
     cum_indeces = np.zeros(len(old_cumindeces))
 

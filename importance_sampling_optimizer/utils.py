@@ -15,8 +15,7 @@ from .disney_oneshot import (
 from config import JOB_TEMPLATE_IMP_SAMPLING
 from .result_collector.config import JOB_TEMPLATE as JOB_COLLECTOR_TEMPLATE
 
-
-def CreateSimulationJobInput(point, number, sampling, seed):
+def CreateSimulationJobInput(point, number, sampling, seed, point_id, share, tag):
     job = copy.deepcopy(JOB_TEMPLATE_IMP_SAMPLING)
     job['container']['cmd'] = \
         job['container']['cmd'].format(
@@ -24,7 +23,10 @@ def CreateSimulationJobInput(point, number, sampling, seed):
             sampling=sampling,
             seed=seed,
             job_id=number+1,
-            IMAGE_TAG=IMAGE_TAG
+            IMAGE_TAG=IMAGE_TAG,
+            point_id=point_id,
+            share=share,
+            tag=tag
         )
 
     return json.dumps(job)
