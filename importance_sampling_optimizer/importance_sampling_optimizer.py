@@ -44,7 +44,6 @@ def main():
         X = [common.StripFixedParams(point) for point in X]
         clf.tell(X, y)
 
-    i = 0
     while True:
         points = clf.ask(
             n_points=POINTS_IN_BATCH,
@@ -54,7 +53,7 @@ def main():
 
         shield_jobs = []
         for j in range(len(points)):
-            SubmitDockerJobs(points[i], tag, sampling='IS', seed=1, point_id=i * len(points) + j, share=0.05, tag="impsampl")
+            SubmitDockerJobs(points[j], tag, sampling='IS', seed=1, point_id=j, share=0.05, tag="impsampl")
 
 
         shield_jobs = WaitCompleteness(shield_jobs)
@@ -70,8 +69,6 @@ def main():
 
         with open('result.pkl', 'wb') as f:
             pickle.dump(result, f)
-
-        i += 1
 
 
 if __name__ == '__main__':
