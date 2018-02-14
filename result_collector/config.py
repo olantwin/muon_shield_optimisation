@@ -1,5 +1,5 @@
 IMAGE = 'olantwin/ship-shield'
-IMAGE_TAG = 
+IMAGE_TAG =
 
 JOB_TEMPLATE = {
     'input': ['eos:/eos/experiment/ship/skygrid/importance_sampling'],
@@ -21,7 +21,7 @@ JOB_TEMPLATE = {
         'run_id':
         'near_run3',
         'cmd':
-        '''python2 /code/compute_loss.py '''
+        '''python2 /code/result_collector/aggregate_results.py '''
         '''--tag {tag}''',
     },
     'required_outputs': {
