@@ -4,7 +4,7 @@ import ROOT as r
 import shlex, subprocess
 import argparse
 
-SLAVE_CMD = '''python2 code/slave.py '''
+SLAVE_CMD = '''python2 slave.py '''
             '''--params {params} '''
             '''-f /shield/worker_files/sampling_is/'''
             '''muons.root '''
@@ -116,7 +116,7 @@ def main():
     args.xs_path = os.path.join("/output", get_xs_path(args.tag, args.point_id))
 
     number_of_muons = count_muons(args.input)
-    muon_loss, muon_indeces = load_previous_cumulative_arrays():
+    muon_loss, muon_indeces = load_previous_cumulative_arrays()
 
     if len(muon_loss) == 0:
         next_indeces = np.arange(number_of_muons)
