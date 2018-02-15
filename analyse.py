@@ -142,6 +142,8 @@ def analyse(tree, outputfile):
                         else:
                             h['anti-mu_w_pos'].Fill(-x, y, w)
                             draw = 6
+                    else:
+                        xs.push_back(0.)
         if draw:
             graph_x, graph_y = graph_tracks(event)
             graph_x.SetLineColor(draw)
