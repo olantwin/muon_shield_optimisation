@@ -5,7 +5,7 @@ SLEEP_TIME = 60
 
 JOB_TEMPLATE_IMP_SAMPLING = {
     'input': ['eos:/eos/experiment/ship/skygrid/importance_sampling',
-              'eos:/eos/experiment/ship/data/Mbias/'
+              'eos:/eos/experiment/ship/data/Mbias/'\
               'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'],
 
     'container': {
