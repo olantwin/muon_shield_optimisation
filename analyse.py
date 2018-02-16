@@ -104,10 +104,10 @@ def analyse(tree, outputfile):
         original_muon = event.MCTrack[1]
         h['smear'].Fill(original_muon.GetStartX(), original_muon.GetStartY())
         draw = False
+        weight = 0.
         for hit in event.vetoPoint:
             if hit:
                 if not hit.GetEnergyLoss() > 0:
-                    xs.push_back(0.)
                     continue
                 pid = hit.PdgCode()
                 if (
@@ -130,7 +130,7 @@ def analyse(tree, outputfile):
                             (x < 2.6 * u.m and x > -3 * u.m)
                     ):
                         w = np.sqrt((560. - (x + 300.)) / 560.)
-                        xs.push_back(w)
+                        weight += w
                         h['mu_p'].Fill(P)
                         original_muon = event.MCTrack[1]
                         h['mu_p_original'].Fill(original_muon.GetP())
@@ -143,8 +143,7 @@ def analyse(tree, outputfile):
                         else:
                             h['anti-mu_w_pos'].Fill(-x, y, w)
                             draw = 6
-                    else:
-                        xs.push_back(0.)
+        xs.push_back(weight)
         if draw:
             graph_x, graph_y = graph_tracks(event)
             graph_x.SetLineColor(draw)
