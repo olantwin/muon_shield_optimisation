@@ -1,6 +1,6 @@
 
 IMAGE = 'olantwin/ship-shield'
-IMAGE_TAG =
+IMAGE_TAG = 20180215
 SLEEP_TIME = 60
 
 JOB_TEMPLATE_IMP_SAMPLING = {

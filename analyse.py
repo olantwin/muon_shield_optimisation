@@ -107,6 +107,7 @@ def analyse(tree, outputfile):
         for hit in event.vetoPoint:
             if hit:
                 if not hit.GetEnergyLoss() > 0:
+                    xs.push_back(0.)
                     continue
                 pid = hit.PdgCode()
                 if (

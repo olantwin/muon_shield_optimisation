@@ -16,11 +16,11 @@ def loss(x):
 
 
 def get_xs_path(tag, id):
-    return os.path.join("/output", "xs_" + tag + str(id))
+    return os.path.join("/output", "xs_" + tag + str(id) + '.npy')
 
 
 def get_indeces_path(tag, id):
-    return os.path.join("/output", "index_" + tag + str(id))
+    return os.path.join("/output", "index_" + tag + str(id) + '.npy')
 
 
 def start_slave(command_line):
@@ -48,13 +48,13 @@ def sample_muons(muon_loss, muon_indeces, share=0.05):
     if share is None:
         share = 0.05
 
-    weights = muon_loss / moun_indeces
-    sample_size = int(len(weigths) * share)
+    weights = muon_loss / muon_indeces
+    sample_size = int(len(weights) * share)
 
     if sample_size == 0:
         raise
 
-    return np.random.choice(len(weights), size=sample_size, p=weigts/np.sum(weights), replace=True)
+    return np.random.choice(len(weights), size=sample_size, p=weights/np.sum(weights), replace=True)
 
 
 def create_muons_files(filename_read, filename_write, indexes):
@@ -83,6 +83,7 @@ def create_muons_files(filename_read, filename_write, indexes):
 
     outtuple.Write()
     f.Close()
+    out.Close()
 
 
 def count_muons(filename_read):

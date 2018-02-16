@@ -2,7 +2,15 @@ import numpy as np
 import re
 import os
 import argparse
-from utils import get_xs_path, loss, get_indeces_path
+from utils import loss
+
+
+def get_xs_path(tag, id):
+    return os.path.join("/input", "xs_" + tag + str(id) + '.npy')
+
+
+def get_indeces_path(tag, id):
+    return os.path.join("/input", "index_" + tag + str(id) + '.npy')
 
 
 def get_number(filename):
@@ -21,7 +29,7 @@ def load_previous_results(tag):
     '''
     prev_results = []
     prev_indeces = []
-    files = os.listdir("/output")
+    files = os.listdir("/input")
 
     for filename in files:
         if "xs_" + tag in filename:
@@ -39,14 +47,11 @@ def calculate_cuminfo(muon_loss, muon_indeces, old_cumloss, old_cumindeces):
     '''
     Function accumulates new results.
     '''
-    cum_loss = np.zeros(len(old_cumloss))
-    cum_indeces = np.zeros(len(old_cumindeces))
-
     for i in range(len(muon_loss)):
-        cum_loss[muon_indeces[i]] += muon_loss[i]
-        cum_indeces[muon_indeces[i]] += 1
+        old_cumloss[muon_indeces[i]] += muon_loss[i]
+        old_cumindeces[muon_indeces[i]] += 1
 
-    return cum_loss, cum_indeces
+    return old_cumloss, old_cumindeces
 
 
 def main():
