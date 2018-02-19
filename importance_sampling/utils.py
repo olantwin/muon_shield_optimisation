@@ -4,7 +4,7 @@ import json
 import copy
 import time
 
-from .disney_oneshot import (
+from muon_shield_optimisation.disney_oneshot import (
     get_result,
     CreateMetaData,
     ExtractParams,
@@ -12,8 +12,10 @@ from .disney_oneshot import (
     STATUS_FINAL
 )
 
-from config import JOB_TEMPLATE_IMP_SAMPLING
-from .result_collector.config import JOB_TEMPLATE as JOB_COLLECTOR_TEMPLATE
+from disneylandClient import (Job, RequestWithId, ListJobsRequest)
+
+from config import JOB_TEMPLATE_IMP_SAMPLING, IMAGE_TAG, SLEEP_TIME
+from muon_shield_optimisation.weighter.config import JOB_TEMPLATE as JOB_COLLECTOR_TEMPLATE
 
 
 def CreateSimulationJobInput(point, sampling, seed, point_id, share, tag):
@@ -43,17 +45,17 @@ def CreateCollectorJobInput(tag):
     return json.dumps(job)
 
 
-def SubmitDockerJobs(point, tag, sampling, seed, point_id, share, tag):
+def SubmitDockerJobs(stub, point, user_tag, sampling, seed, point_id, share, tag):
     return [
         stub.CreateJob(Job(
             input=CreateSimulationJobInput(point, sampling, seed, point_id, share, tag),
             kind='docker',
-            metadata=CreateMetaData(point, tag, sampling=sampling, seed=seed)
+            metadata=CreateMetaData(point, user_tag, sampling=sampling, seed=seed)
         ))
         ]
 
 
-def ProcessJob(job, space, tag):
+def ProcessJob(stub, job, space, tag):
     if json.loads(job[0].metadata)['user']['tag'] == tag:
         try:
             weight, length, _, muons_w = get_result(job)
@@ -73,10 +75,10 @@ def ProcessJob(job, space, tag):
             print(e)
 
 
-def ProcessJobs(jobs, space, tag):
+def ProcessJobs(stub, jobs, space, tag):
     print("[{}] Processing jobs...".format(time.time()))
     results = [
-        ProcessJob(job, space, tag)
+        ProcessJob(stub, job, space, tag)
         for job in jobs
     ]
     print(f"Got results {results}")
@@ -87,7 +89,7 @@ def ProcessJobs(jobs, space, tag):
         return [], []
 
 
-def WaitCompleteness(jobs):
+def WaitCompleteness(stub, jobs):
     work_time = 0
     while True:
         time.sleep(SLEEP_TIME)
@@ -102,7 +104,7 @@ def WaitCompleteness(jobs):
         ]
         jobs_completed = [job.status
                           in STATUS_FINAL
-                          for point in uncompleted_jobs
+                          for point in jobs
                           for job in point]
 
         if all(jobs_completed):
@@ -120,13 +122,13 @@ def WaitCompleteness(jobs):
             return completed_jobs
 
 
-def CollectResults(tag):
+def CollectResults(stub, tag):
     job_input = CreateCollectorJobInput(tag)
     job = stub.CreateJob(Job(
         input=job_input,
         kind='docker'
     ))
-    WaitCompleteness([job])
+    WaitCompleteness(stub, [[job]])
 
 
 def ConvertToPoints(disney_points, tag):

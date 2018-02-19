@@ -2,8 +2,8 @@
 import argparse
 import pickle
 
-from .disney_common import (AddFixedParams, CreateDiscreteSpace, StripFixedParams)
-from importance_sampling_config import POINTS_IN_BATCH
+from muon_shield_optimisation.disney_common import (AddFixedParams, CreateDiscreteSpace, StripFixedParams)
+from config import POINTS_IN_BATCH
 
 from utils import (WaitCompleteness, ProcessJobs, ConvertToPoints, CollectResults, SubmitDockerJobs)
 
@@ -27,7 +27,7 @@ def main():
         type=int
     )
     args = parser.parse_args()
-    tag = "important_sampling_{args.opt}_{args.tag}".format(**args)
+    tag = "important_sampling_{opt}_{tag}".format(**vars(args))
     print(tag)
 
     space = CreateDiscreteSpace()
@@ -54,15 +54,16 @@ def main():
 
         shield_jobs = []
         for j in range(len(points)):
-            SubmitDockerJobs(points[j], tag, sampling='IS', seed=1, point_id=j, share=0.05, tag="impsampl")
+           shield_jobs.append(SubmitDockerJobs(stub, points[j], tag, sampling='IS', seed=1, point_id=j, share=0.05, tag="impsampl"))
 
-        shield_jobs = WaitCompleteness(shield_jobs)
-        X_new, y_new = ProcessJobs(shield_jobs, space, tag)
+        shield_jobs = WaitCompleteness(stub, shield_jobs)
+        print(shield_jobs[0][0].metadata)
+        X_new, y_new = ProcessJobs(stub, shield_jobs, space, tag)
 
         print('Received new points ', X_new, y_new)
         X_new = [StripFixedParams(point) for point in X_new]
         result = clf.tell(X_new, y_new)
-        CollectResults("impsampl")
+        CollectResults(stub, "impsampl")
 
         with open('optimiser.pkl', 'wb') as f:
             pickle.dump(clf, f)

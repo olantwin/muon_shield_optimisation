@@ -4,12 +4,12 @@ import argparse
 from utils import *
 
 
-SLAVE_CMD = '''python2 slave.py '''
-            '''--params {params} '''
-            '''-f /shield/worker_files/sampling_is/'''
-            '''muons.root '''
-            '''--results /output/result.json '''
-            '''--hists /output/hists_{tag}.root --seed {seed} '''
+SLAVE_CMD = '''python2 slave.py ''' \
+            '''--params {params} ''' \
+            '''-f /shield/worker_files/sampling_is/''' \
+            '''muons.root ''' \
+            '''--results /output/result.json ''' \
+            '''--hists /output/hists_{tag}.root --seed {seed} ''' \
             '''--xs_path {xs_path}'''
 
 
