@@ -1,6 +1,6 @@
 import numpy as np
 import os
-import ROOT as r
+import rootpy.ROOT as r
 import shlex
 import subprocess
 from array import array
@@ -58,7 +58,7 @@ def sample_muons(muon_loss, muon_indeces, share=0.05):
     return np.random.choice(len(weights), size=sample_size, p=weights/np.sum(weights), replace=True)
 
 
-def create_muons_files(filename_read, filename_write, indexes):
+def create_muons_files(filename_read, filename_write, indeces):
     '''
     Function takes all the muons, choose subsample according to indeces and saves it to filename_write
     '''
@@ -69,19 +69,20 @@ def create_muons_files(filename_read, filename_write, indexes):
 
     i = 0
     ind_cur = 0
-    indexes = np.sort(indexes)
+    indeces = np.sort(indeces)
+    tmp = np.bincount(indeces)
+    counted_indeces = tmp[tmp != 0]
 
     for muon in intuple:
         a = array('f', [y for x in muon.values() for y in x])
-
-        while (i == indexes[ind_cur]):
-            outtuple.Fill(a)
-            if (ind_cur < len(indexes) - 1 and indexes[ind_cur] != indexes[ind_cur + 1]):
-                ind_cur += 1
-                break
+        if (i == indeces[ind_cur]):
+            for _ in range(counted_indeces[ind_cur]):
+                outtuple.Fill(a)
             ind_cur += 1
-            if (ind_cur == len(indexes)):
-                break
+
+        if ind_cur == len(indeces):
+            break
+
         i += 1
 
     outtuple.Write()

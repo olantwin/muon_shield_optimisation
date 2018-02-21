@@ -6,8 +6,7 @@ from utils import *
 
 SLAVE_CMD = '''python2 slave.py ''' \
             '''--params {params} ''' \
-            '''-f /shield/worker_files/sampling_is/''' \
-            '''muons.root ''' \
+            '''-f /home/muons.root ''' \
             '''--results /output/result.json ''' \
             '''--hists /output/hists_{tag}.root --seed {seed} ''' \
             '''--xs_path {xs_path}'''
@@ -40,7 +39,7 @@ def main():
     else:
         next_indeces = sample_muons(muon_loss, muon_indeces, share=args.share_muons)
 
-    create_muons_files(args.input, "/shield/worker_files/sampling_is/muons.root", next_indeces)
+    create_muons_files(args.input, "/home/muons.root", next_indeces)
     np.save(get_indeces_path(args.tag, args.point_id), next_indeces)
 
     command_line = get_command_line(SLAVE_CMD, args)
