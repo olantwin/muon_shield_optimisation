@@ -3,6 +3,7 @@ import os
 import ROOT as r
 import shlex
 import subprocess
+from array import array
 
 
 def loss(x):
@@ -71,8 +72,10 @@ def create_muons_files(filename_read, filename_write, indexes):
     indexes = np.sort(indexes)
 
     for muon in intuple:
+        a = array('f', [y for x in muon.values() for y in x])
+
         while (i == indexes[ind_cur]):
-            outtuple.Fill(muon)
+            outtuple.Fill(a)
             if (ind_cur < len(indexes) - 1 and indexes[ind_cur] != indexes[ind_cur + 1]):
                 ind_cur += 1
                 break
