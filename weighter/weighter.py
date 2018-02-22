@@ -4,7 +4,7 @@ import argparse
 from utils import *
 
 
-SLAVE_CMD = '''python2 slave.py ''' \
+SLAVE_CMD = '''python2 /code/slave.py ''' \
             '''--params {params} ''' \
             '''-f /home/muons.root ''' \
             '''--results /output/result.json ''' \

@@ -52,6 +52,8 @@ def sample_muons(muon_loss, muon_indeces, share=0.05):
     weights = muon_loss / muon_indeces
     sample_size = int(len(weights) * share)
 
+    if np.sum(weights) == 0:
+        return np.random.choice(len(weights), size=sample_size, replace=True)
     if sample_size == 0:
         raise
 
