@@ -16,7 +16,7 @@ from disneylandClient import (Job, RequestWithId, ListJobsRequest)
 
 from config import JOB_TEMPLATE_IMP_SAMPLING, IMAGE_TAG, SLEEP_TIME
 from muon_shield_optimisation.weighter.config import JOB_TEMPLATE as JOB_COLLECTOR_TEMPLATE
-
+from muon_shield_optimisation.disney_common import (FCN)
 
 def CreateSimulationJobInput(point, sampling, seed, point_id, share, tag):
     job = copy.deepcopy(JOB_TEMPLATE_IMP_SAMPLING)
@@ -59,7 +59,7 @@ def ProcessJob(stub, job, space, tag):
     if json.loads(job[0].metadata)['user']['tag'] == tag:
         try:
             weight, length, _, muons_w = get_result(job)
-            y = common.FCN(weight, muons_w, length)
+            y = FCN(weight, muons_w, length)
             X = ExtractParams(job[0].metadata)
 
             stub.CreateJob(Job(

@@ -71,13 +71,14 @@ def create_muons_files(filename_read, filename_write, indeces):
 
     i = 0
     ind_cur = 0
-    indeces = np.sort(indeces)
+
     tmp = np.bincount(indeces)
+    indeces = np.unique(np.sort(indeces))
     counted_indeces = tmp[tmp != 0]
 
     for muon in intuple:
-        a = array('f', [y for x in muon.values() for y in x])
         if (i == indeces[ind_cur]):
+            a = array('f', [y for x in muon.values() for y in x])
             for _ in range(counted_indeces[ind_cur]):
                 outtuple.Fill(a)
             ind_cur += 1
