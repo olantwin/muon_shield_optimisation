@@ -21,8 +21,9 @@ JOB_TEMPLATE = {
         'run_id':
         'near_run3',
         'cmd':
+        '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh;'''
         '''python2 /code/weighter/aggregate_results.py '''
-        '''--tag {tag}''',
+        '''--tag {tag}' ''',
     },
     'required_outputs': {
         'output_uri': 'eos:/eos/experiment/ship/skygrid/importance_sampling',
