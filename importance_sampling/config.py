@@ -6,7 +6,8 @@ POINTS_IN_BATCH = 1
 RUN = 'imp_sampling_test'
 
 JOB_TEMPLATE_IMP_SAMPLING = {
-    'input': ['eos:/eos/experiment/ship/skygrid/importance_sampling',
+    'input': ['eos:/eos/experiment/ship/skygrid/importance_sampling/cumloss.npy',
+              'eos:/eos/experiment/ship/skygrid/importance_sampling/cumindeces.npy',
               'eos:/eos/experiment/ship/data/Mbias/'
               'pythia8_Geant4-withCharm_onlyMuons_4magTarget.root'],
 

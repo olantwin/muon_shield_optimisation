@@ -35,8 +35,15 @@ def CreateSimulationJobInput(point, sampling, seed, point_id, share, tag):
     return json.dumps(job)
 
 
-def CreateCollectorJobInput(tag):
+def CreateCollectorJobInput(tag, number_of_points):
     job = copy.deepcopy(JOB_COLLECTOR_TEMPLATE)
+    main_path = 'eos:/eos/experiment/ship/skygrid/importance_sampling'
+    for i in range(number_of_points):
+        job['input'].append(main_path + "/xs_" + tag + str(i) + ".npy")
+        job['input'].append(main_path + "/index_" + tag + str(i) + ".npy")
+
+    job['input'].append(main_path + "/cumloss.npy")
+    job['input'].append(main_path + "/cumindeces.npy")
     job['container']['cmd'] = \
         job['container']['cmd'].format(
             tag=tag
@@ -122,8 +129,8 @@ def WaitCompleteness(stub, jobs):
             return completed_jobs
 
 
-def CollectResults(stub, tag):
-    job_input = CreateCollectorJobInput(tag)
+def CollectResults(stub, tag, number_of_points):
+    job_input = CreateCollectorJobInput(tag, number_of_points)
     job = stub.CreateJob(Job(
         input=job_input,
         kind='docker'
