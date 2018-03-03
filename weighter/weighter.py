@@ -24,6 +24,7 @@ def main():
     parser.add_argument('--point_id', type=int, required=True)
     parser.add_argument('--tag', default="")
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--sampling_seed', type=int, default=None)
     parser.add_argument('--share_muons', type=float)
 
     args = parser.parse_args()
@@ -37,7 +38,7 @@ def main():
         np.save("/output/cumloss.npy", np.zeros(number_of_muons))
         np.save("/output/cumindeces.npy", np.ones(number_of_muons) * 1e-5)
     else:
-        next_indeces = sample_muons(muon_loss, muon_indeces, share=args.share_muons)
+        next_indeces = sample_muons(muon_loss, muon_indeces, share=args.share_muons, seed=args.sampling_seed)
 
     create_muons_files(args.input, "/home/muons.root", next_indeces)
     np.save(get_indeces_path(args.tag, args.point_id), next_indeces)

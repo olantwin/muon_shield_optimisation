@@ -42,7 +42,7 @@ def load_previous_cumulative_arrays():
         return np.array([]), np.array([])
 
 
-def sample_muons(muon_loss, muon_indeces, share=0.05):
+def sample_muons(muon_loss, muon_indeces, share=0.05, seed=None):
     '''
     Function sample the indexes of muons according to weights
     '''
@@ -53,10 +53,12 @@ def sample_muons(muon_loss, muon_indeces, share=0.05):
     sample_size = int(len(weights) * share)
 
     if np.sum(weights) == 0:
+        np.random.seed(seed)
         return np.random.choice(len(weights), size=sample_size, replace=True)
     if sample_size == 0:
         raise
-
+        
+    np.random.seed(seed)
     return np.random.choice(len(weights), size=sample_size, p=weights/np.sum(weights), replace=True)
 
 
