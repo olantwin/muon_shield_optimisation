@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--share_muons', type=float)
 
     args = parser.parse_args()
-    args.xs_path = os.path.join("/output", get_xs_path(args.tag, args.point_id))
+    args.xs_path = get_xs_path(args.tag, args.point_id)
 
     number_of_muons = count_muons(args.input)
     muon_loss, muon_indeces = load_previous_cumulative_arrays()

@@ -17,11 +17,11 @@ def loss(x):
 
 
 def get_xs_path(tag, id):
-    return os.path.join("/output", "xs_" + tag + str(id) + '.npy')
+    return os.path.join("/output/previous_results", "xs_" + tag + str(id) + '.npy')
 
 
 def get_indeces_path(tag, id):
-    return os.path.join("/output", "index_" + tag + str(id) + '.npy')
+    return os.path.join("/output/previous_results", "index_" + tag + str(id) + '.npy')
 
 
 def start_slave(command_line):

@@ -38,9 +38,6 @@ def CreateSimulationJobInput(point, sampling, seed, point_id, share, tag):
 def CreateCollectorJobInput(tag, number_of_points):
     job = copy.deepcopy(JOB_COLLECTOR_TEMPLATE)
     main_path = 'eos:/eos/experiment/ship/skygrid/importance_sampling'
-    for i in range(number_of_points):
-        job['input'].append(main_path + "/xs_" + tag + str(i) + ".npy")
-        job['input'].append(main_path + "/index_" + tag + str(i) + ".npy")
 
     job['input'].append(main_path + "/cumloss.npy")
     job['input'].append(main_path + "/cumindeces.npy")

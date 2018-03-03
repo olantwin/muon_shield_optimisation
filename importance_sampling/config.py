@@ -30,6 +30,7 @@ JOB_TEMPLATE_IMP_SAMPLING = {
         'near_run3',
         'cmd':
         '''/bin/bash -l -c 'source /opt/FairShipRun/config.sh; '''
+        '''mkdir -p /output/previous_results;'''
         '''python2 /code/weighter/weighter.py '''
         '''--params {params} '''
         '''--results /output/result.json '''
