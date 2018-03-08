@@ -9,10 +9,6 @@ import rootUtils as ut
 from get_geo import get_geo
 from disney_common import FCN
 
-Z_T4 = 3538
-Z_T1 = Z_T4 - 940
-Z_Sensitive_Plane = Z_T1
-
 
 def graph_tracks(event):
     """Create graphs of tracks in event by interpolating between vetoPoints."""
@@ -111,8 +107,7 @@ def analyse(tree, outputfile):
                     continue
                 pid = hit.PdgCode()
                 if (
-                        hit.GetZ() > (Z_Sensitive_Plane - 1) and
-                        hit.GetZ() < (Z_Sensitive_Plane + 1) and
+                        hit.GetZ() > 0 and
                         abs(pid) == 13
                 ):
                     hit.Momentum(mom)
